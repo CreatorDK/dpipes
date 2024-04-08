@@ -4,6 +4,6 @@
     {
         public int Code {  get; set; }
         public int DataType { get; set; }
-        public byte[]? Data { get; set; }
+        public byte[] Data { get; set; }
     }
 }

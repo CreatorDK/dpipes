@@ -1,9 +1,15 @@
 ﻿namespace CreatorDK.IO.DPipes
 {
-    public class PacketHeader(int dataSize, uint serviceCode)
+    public class PacketHeader
     {
-        private readonly uint _serviceCode = serviceCode;
-        private readonly int _dataSize = dataSize;
+        private readonly int _dataSize;
+        private readonly uint _serviceCode;
+
+        public PacketHeader(int dataSize, uint serviceCode)
+        {
+            _dataSize = dataSize;
+            _serviceCode = serviceCode;
+        }
 
         public int DataSize => _dataSize;
         public uint ServiceCode => _serviceCode;

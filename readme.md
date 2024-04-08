@@ -1,6 +1,6 @@
 dpipes-dotnet-cpp-win32
 =======
-DPipes is abstract classes (both for C++ and .NET 8 applications) to IPC communications for 4 scenarios:
+DPipes is abstract classes (both for C++ and .NET applications) to IPC communications for 4 scenarios:
 Inniciator - Client:
 1) .NET app - .NET app
 2) C++ app - C++ app

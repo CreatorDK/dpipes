@@ -1,12 +1,15 @@
 ﻿using Microsoft.Win32.SafeHandles;
+using System;
+using System.IO;
 using System.IO.Pipes;
+using System.Threading;
 
 namespace CreatorDK.IO.DPipes
 {
     public class DPipeAnonymus : DPipe
     {
-        SafePipeHandle? _readClientSafeHandle = null;
-        SafePipeHandle? _writeClientSafeHandle = null;
+        SafePipeHandle _readClientSafeHandle = null;
+        SafePipeHandle _writeClientSafeHandle = null;
 
         public DPipeAnonymus(string name = DPipeAnonymousHandle.DefaultPipeName, 
             int inBufferSize = (int)Constants.PIPE_BUFFERLENGTH_DEFAULT, 
@@ -149,7 +152,7 @@ namespace CreatorDK.IO.DPipes
         {
             return GetHandle().AsString();
         }
-        public void Connect(DPipeAnonymousHandle pipeHandle, byte[]? connectData = null)
+        public void Connect(DPipeAnonymousHandle pipeHandle, byte[] connectData = null)
         {
             if (_mode == DPIPE_MODE.CLIENT || _mode == DPIPE_MODE.INNITIATOR)
                 return;
@@ -175,7 +178,7 @@ namespace CreatorDK.IO.DPipes
             if (connectData != null && connectDataSize > 0)
                 WriteRaw(connectData, 0, connectDataSize);
         }
-        public override void Connect(IDPipeHandle pipeHandle, byte[]? connectData = null)
+        public override void Connect(IDPipeHandle pipeHandle, byte[] connectData = null)
         {
             if (_mode == DPIPE_MODE.CLIENT || _mode == DPIPE_MODE.INNITIATOR)
                 return;
@@ -190,7 +193,7 @@ namespace CreatorDK.IO.DPipes
         {
             Connect(dPipeHandle, null);
         }
-        public override void Connect(string handleString, byte[]? connectData)
+        public override void Connect(string handleString, byte[] connectData)
         {
             var anonymusHandle = DPipeAnonymousHandle.Create(handleString);
             Connect(anonymusHandle, connectData);

@@ -1,12 +1,16 @@
-﻿using System.Text;
+﻿using System;
+using System.Collections.Generic;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CreatorDK.IO.DPipes
 {
-    public delegate void DataReceivedHandler(byte[]? data);
+    public delegate void DataReceivedHandler(byte[] data);
 
     public class DPServer : DPipeMessangerBase
     {
-        public DPServer(DPipe dpipe, bool handleAsync, Encoding? encoding = null, uint stringBufferSize = 4096) : 
+        public DPServer(DPipe dpipe, bool handleAsync, Encoding encoding = null, uint stringBufferSize = 4096) : 
             base(dpipe, encoding, stringBufferSize)
         {
             _handleAsync = handleAsync;
@@ -30,18 +34,18 @@ namespace CreatorDK.IO.DPipes
         private Dictionary<int, DPHandler> _handlers = new Dictionary<int, DPHandler>();
         private Mutex _handlerMutex = new Mutex(false);
 
-        public DataReceivedHandler? OnClientConnect;
-        public DataReceivedHandler? OnClientDisconnect;
+        public DataReceivedHandler OnClientConnect;
+        public DataReceivedHandler OnClientDisconnect;
 
         private void OnClientConnectInner(PacketHeader header)
         {
-            byte[]? data = _dpipe.Read(header);
+            byte[] data = _dpipe.Read(header);
 
             OnClientConnect?.Invoke(data);
         }
         private void OnClientDisonnectInner(PacketHeader header)
         {
-            byte[]? data = _dpipe.Read(header);
+            byte[] data = _dpipe.Read(header);
 
             OnClientDisconnect?.Invoke(data);
         }
@@ -53,7 +57,7 @@ namespace CreatorDK.IO.DPipes
             //If data is string
             if (isStringData)
             {
-                string? message = GetStringFromPipe(header.DataSize);
+                string message = GetStringFromPipe(header.DataSize);
 
                 if (_handleAsync)
                 {
@@ -78,7 +82,7 @@ namespace CreatorDK.IO.DPipes
 
                     int dataSize = header.DataSize - (int)Constants.DP_REQUEST_SIZE;
 
-                    byte[]? data = null;
+                    byte[] data = null;
 
                     if (dataSize > 0)
                     {
@@ -99,7 +103,7 @@ namespace CreatorDK.IO.DPipes
                 //ReadData from Data Message
                 else
                 {
-                    byte[]? messageData = _dpipe.Read(header);
+                    byte[] messageData = _dpipe.Read(header);
 
                     if (_handleAsync)
                     {
@@ -112,13 +116,13 @@ namespace CreatorDK.IO.DPipes
                 }
             }
         }
-        private void OnRequestReceived(DPRequestHeader requestHeader, byte[]? data)
+        private void OnRequestReceived(DPRequestHeader requestHeader, byte[] data)
         {
             DPClientRequest request = new DPClientRequest(requestHeader.Guid, requestHeader.Code, requestHeader.DataType, data);
 
             bool handlerExists = false;
 
-            DPHandler? functionDelegate = null;
+            DPHandler functionDelegate = null;
 
             _handlerMutex.WaitOne();
             if (_handlers.ContainsKey(requestHeader.Code))
@@ -150,11 +154,13 @@ namespace CreatorDK.IO.DPipes
         }
         private DPRequestHeader GetRequestHeader()
         {
-            var guidBytes = new Span<byte>(_pBufferRequest, 0, 16);
+            //byte[] guidBytes = new byte[16];
+            //System.Buffer.BlockCopy(_pBufferResponse, 0, guidBytes, 0, 16);
 
             return new DPRequestHeader()
             {
-                Guid = new Guid(guidBytes),
+                Guid = new Guid(_pBufferRequest),
+                //Guid = new Guid(guidBytes),
                 Code = BitConverter.ToInt32(_pBufferRequest, 16),
                 DataType = BitConverter.ToInt32(_pBufferRequest, 20),
             };
@@ -184,7 +190,7 @@ namespace CreatorDK.IO.DPipes
         {
             _dpipe.Start();
         }
-        public void Disconnect(byte[]? data = null)
+        public void Disconnect(byte[] data = null)
         {
             _dpipe.Disconnect(data);
         }

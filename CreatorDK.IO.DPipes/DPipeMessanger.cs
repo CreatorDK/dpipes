@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Threading.Tasks;
 
 namespace CreatorDK.IO.DPipes
 {
@@ -23,21 +24,21 @@ namespace CreatorDK.IO.DPipes
             _dpipe.OnPacketHeaderReceivedCallback = null;
         }
 
-        public delegate void StringRecevivedHandler(string? message);
-        public StringRecevivedHandler? OnClientConnect { get; set; }
-        public StringRecevivedHandler? OnOtherSideDisconect { get; set; }
+        public delegate void StringRecevivedHandler(string message);
+        public StringRecevivedHandler OnClientConnect { get; set; }
+        public StringRecevivedHandler OnOtherSideDisconect { get; set; }
 
-        public void Connect(IDPipeHandle pipeHandle, string? connectMessage = null)
+        public void Connect(IDPipeHandle pipeHandle, string connectMessage = null)
         {
             _dpipe.Connect(pipeHandle, connectMessage, _encoding);
         }
 
-        public void Connect(string pipeHandleString, string? connectMessage = null)
+        public void Connect(string pipeHandleString, string connectMessage = null)
         {
             _dpipe.Connect(pipeHandleString, connectMessage, _encoding);
         }
 
-        public void Disconnect(string? disconnectMessage = null)
+        public void Disconnect(string disconnectMessage = null)
         {
             _dpipe.Disconnect(disconnectMessage, _encoding);
         }
@@ -67,7 +68,7 @@ namespace CreatorDK.IO.DPipes
             }
             else if (header.Command > 0)
             {
-                byte[]? data = null;
+                byte[] data = null;
 
                 if (header.DataSize > 0)
                 {

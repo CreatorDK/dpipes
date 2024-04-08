@@ -1,9 +1,8 @@
 ﻿using Microsoft.Win32.SafeHandles;
+using System;
 using System.IO.Pipes;
-using System.Runtime.Versioning;
 using System.Security.Principal;
-using System.Xml.Linq;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using System.Threading;
 
 namespace CreatorDK.IO.DPipes
 {
@@ -151,7 +150,6 @@ namespace CreatorDK.IO.DPipes
             Start(1, PipeOptions.None);
         }
 
-        [SupportedOSPlatform("windows")]
         public void SetAccessControl(PipeSecurity pipeSecurity)
         {
             if (_mode == DPIPE_MODE.CLIENT)
@@ -189,7 +187,7 @@ namespace CreatorDK.IO.DPipes
         {
             return GetHandle().AsString();
         }
-        public void Connect(DPipeNamedHandle pipeHandle, byte[]? connectData = null)
+        public void Connect(DPipeNamedHandle pipeHandle, byte[] connectData = null)
         {
             if (_mode == DPIPE_MODE.CLIENT || _mode == DPIPE_MODE.INNITIATOR)
                 return;
@@ -240,7 +238,7 @@ namespace CreatorDK.IO.DPipes
             if (connectData != null && connectDataSize > 0)
                 WriteRaw(connectData, 0, connectDataSize);
         }
-        public override void Connect(IDPipeHandle pipeHandle, byte[]? connectData)
+        public override void Connect(IDPipeHandle pipeHandle, byte[] connectData)
         {
             if (_mode == DPIPE_MODE.CLIENT || _mode == DPIPE_MODE.INNITIATOR)
                 return;
@@ -255,7 +253,7 @@ namespace CreatorDK.IO.DPipes
         {
             Connect(pipeHandle, null);
         }
-        public override void Connect(string handleString, byte[]? data)
+        public override void Connect(string handleString, byte[] data)
         {
             var namedHandle = DPipeNamedHandle.Create(handleString);
             Connect(namedHandle, data);

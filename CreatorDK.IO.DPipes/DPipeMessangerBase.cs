@@ -1,5 +1,7 @@
-﻿using System.Text;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+﻿using System;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CreatorDK.IO.DPipes
 {
@@ -18,8 +20,8 @@ namespace CreatorDK.IO.DPipes
         protected Mutex _mutexWritePipe;
         protected byte[] _stringBuffer;
 
-        public delegate void MessageStringRecevied(string? message);
-        public delegate void MessageDataRecevied(byte[]? data);
+        public delegate void MessageStringRecevied(string message);
+        public delegate void MessageDataRecevied(byte[] data);
         public Encoding Encoding 
         { 
             get 
@@ -35,15 +37,15 @@ namespace CreatorDK.IO.DPipes
                     _encoding = value;
             }
         }
-        public MessageStringRecevied? OnMessageStringReceived { get; set; }
-        public MessageDataRecevied? OnMessageDataReceived { get; set; }
-        public MessageStringRecevied? OnInfoStringReceived { get; set; }
-        public MessageDataRecevied? OnInfoDataReceived { get; set; }
-        public MessageStringRecevied? OnWarningStringReceived { get; set; }
-        public MessageDataRecevied? OnWarningDataReceived { get; set; }
-        public MessageStringRecevied? OnErrorStringReceived { get; set; }
-        public MessageDataRecevied? OnErrorDataReceived { get; set; }
-        public DPipeMessangerBase(DPipe dpipe, Encoding? encoding, uint stringBufferSize = 4096)
+        public MessageStringRecevied OnMessageStringReceived { get; set; }
+        public MessageDataRecevied OnMessageDataReceived { get; set; }
+        public MessageStringRecevied OnInfoStringReceived { get; set; }
+        public MessageDataRecevied OnInfoDataReceived { get; set; }
+        public MessageStringRecevied OnWarningStringReceived { get; set; }
+        public MessageDataRecevied OnWarningDataReceived { get; set; }
+        public MessageStringRecevied OnErrorStringReceived { get; set; }
+        public MessageDataRecevied OnErrorDataReceived { get; set; }
+        public DPipeMessangerBase(DPipe dpipe, Encoding encoding, uint stringBufferSize = 4096)
         {
             _dpipe = dpipe;
             _encoding = encoding == null ? Encoding.Default : encoding;
@@ -61,7 +63,7 @@ namespace CreatorDK.IO.DPipes
             _dpipe.Read(_stringBuffer, 0, size);
             return _encoding.GetString(_stringBuffer, 0, size);
         }
-        protected virtual void OnMessageDataReceivedInner(PacketHeader header, byte[]? data)
+        protected virtual void OnMessageDataReceivedInner(PacketHeader header, byte[] data)
         {
             switch (header.Command) 
             {
@@ -79,7 +81,7 @@ namespace CreatorDK.IO.DPipes
                     break;
             }
         }
-        protected virtual void OnMessageStringReceivedInner(PacketHeader header, string? message)
+        protected virtual void OnMessageStringReceivedInner(PacketHeader header, string message)
         {
             switch (header.Command)
             {

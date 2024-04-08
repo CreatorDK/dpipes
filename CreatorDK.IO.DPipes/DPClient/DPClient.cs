@@ -1,12 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CreatorDK.IO.DPipes
 {
     public class DPClient : DPipeMessangerBase
     {
-        public DPClient(DPipe dpipe, bool handleAsync, Encoding? encoding = null, uint stringBufferSize = 4096) : 
+        public DPClient(DPipe dpipe, bool handleAsync, Encoding encoding = null, uint stringBufferSize = 4096) : 
             base(dpipe, encoding, stringBufferSize)
         {
             _handleAsync = handleAsync;
@@ -28,11 +31,11 @@ namespace CreatorDK.IO.DPipes
         private List<DPRequestRecord> _requestRecordList = new List<DPRequestRecord>();
         private Mutex _requestRecordListMutex = new Mutex(false);
 
-        public DataReceivedHandler? OnServerDisconnect;
+        public DataReceivedHandler OnServerDisconnect;
 
         private void OnServerDisconnectInner(PacketHeader header)
         {
-            byte[]? data = _dpipe.Read(header);
+            byte[] data = _dpipe.Read(header);
 
             OnServerDisconnect?.Invoke(data);
         }
@@ -45,7 +48,7 @@ namespace CreatorDK.IO.DPipes
             //If data is string
             if (isStringData)
             {
-                string? message = GetStringFromPipe(header.DataSize);
+                string message = GetStringFromPipe(header.DataSize);
 
                 if (_handleAsync)
                 {
@@ -68,7 +71,7 @@ namespace CreatorDK.IO.DPipes
                 //ReadData from Data Message
                 else
                 {
-                    byte[]? messageData = _dpipe.Read(header);
+                    byte[] messageData = _dpipe.Read(header);
 
                     if (_handleAsync)
                     {
@@ -92,7 +95,7 @@ namespace CreatorDK.IO.DPipes
 
             int dataSize = header.DataSize - (int)Constants.DP_RESPONSE_SIZE;
 
-            byte[]? data = null;
+            byte[] data = null;
 
             if (dataSize > 0)
             {
@@ -100,7 +103,7 @@ namespace CreatorDK.IO.DPipes
                 _dpipe.Read(data, 0, dataSize);
             }
 
-            DPRequestRecord? requestRecord = null;
+            DPRequestRecord requestRecord = null;
 
             _requestRecordListMutex.WaitOne();
 
@@ -125,11 +128,13 @@ namespace CreatorDK.IO.DPipes
 
         private DPResponseHeader GetResponseHeader()
         {
-            var guidBytes = new Span<byte>(_pBufferResponse, 0, 16);
+            //byte[] guidBytes = new byte[16];
+            //System.Buffer.BlockCopy(_pBufferResponse, 0, guidBytes, 0, 16);
 
             return new DPResponseHeader()
             {
-                Guid = new Guid(guidBytes),
+                Guid = new Guid(_pBufferResponse),
+                //Guid = new Guid(guidBytes),
                 Code = BitConverter.ToInt32(_pBufferResponse, 16),
                 DataType = BitConverter.ToInt32(_pBufferResponse, 20),
             };
@@ -137,7 +142,7 @@ namespace CreatorDK.IO.DPipes
 
         private void WaitRequestLoop(DPRequestRecord requestRecord, int millisecondsTimeout = 0)
         {
-            Stopwatch? stopWatch = millisecondsTimeout > 0 ? new Stopwatch() : null;
+            Stopwatch stopWatch = millisecondsTimeout > 0 ? new Stopwatch() : null;
             stopWatch?.Start();
 
             while (!requestRecord.IsSucess)
@@ -181,7 +186,7 @@ namespace CreatorDK.IO.DPipes
                 PrepareRequestRecord(request, requestRecord);
                 int dataSize = (int)Constants.DP_REQUEST_SIZE + (request.Data == null ? 0 : request.Data.Length);
 
-                PacketHeader packetHeader = new(dataSize, Constants.DP_REQUEST);
+                PacketHeader packetHeader = new PacketHeader(dataSize, Constants.DP_REQUEST);
                 _dpipe.WritePacketHeader(packetHeader);
 
                 _dpipe.WriteRaw(_pBufferRequest, 0, (int)Constants.DP_REQUEST_SIZE);
@@ -190,7 +195,7 @@ namespace CreatorDK.IO.DPipes
                     _dpipe.WriteRaw(request.Data, 0, request.Data.Length);
             _mutexWritePipe.ReleaseMutex();
 
-            var time1 = stopwatch.Elapsed;
+            TimeSpan time1 = stopwatch.Elapsed;
 
             WaitRequestLoop(requestRecord, millisecondsTimeout);
 
@@ -201,7 +206,7 @@ namespace CreatorDK.IO.DPipes
                 _requestRecordList.Remove(requestRecord);
             _requestRecordListMutex.ReleaseMutex();
 
-            DPResponse? response;
+            DPResponse response;
 
             if (requestRecord.IsSucess)
             {
@@ -219,11 +224,11 @@ namespace CreatorDK.IO.DPipes
                 return response;
         }
 
-        public DPResponse Send(int code, int dataType, byte[]? data, int millisecondsTimeout = 0)
+        public DPResponse Send(int code, int dataType, byte[] data, int millisecondsTimeout = 0)
         {
             return Send(new DPRequest() { Code = code, DataType = dataType, Data = data }, millisecondsTimeout);
         }
-        public DPResponse Send(int code, byte[]? data, int millisecondsTimeout = 0)
+        public DPResponse Send(int code, byte[] data, int millisecondsTimeout = 0)
         {
             return Send(new DPRequest() { Code = code, DataType = 0, Data = data }, millisecondsTimeout);
         }
@@ -233,21 +238,21 @@ namespace CreatorDK.IO.DPipes
             return Task.Run(() => Send(request, millisecondsTimeout));
         }
 
-        public Task<DPResponse> SendAsync(int code, int dataType, byte[]? data, int millisecondsTimeout = 0)
+        public Task<DPResponse> SendAsync(int code, int dataType, byte[] data, int millisecondsTimeout = 0)
         {
             return Task.Run(() => Send(code, dataType, data, millisecondsTimeout));
         }
 
-        public Task<DPResponse> SendAsync(int code, byte[]? data, int millisecondsTimeout = 0)
+        public Task<DPResponse> SendAsync(int code, byte[] data, int millisecondsTimeout = 0)
         {
             return Task.Run(() => Send(code, data, millisecondsTimeout));
         }
 
-        public void Connect(IDPipeHandle handle, byte[]? connectData)
+        public void Connect(IDPipeHandle handle, byte[] connectData)
         {
             _dpipe.Connect(handle, connectData);
         }
-        public void Connect(IDPipeHandle handle, string? connectMessage)
+        public void Connect(IDPipeHandle handle, string connectMessage)
         {
             _dpipe.Connect(handle, connectMessage, _encoding);
         }
@@ -255,11 +260,11 @@ namespace CreatorDK.IO.DPipes
         {
             _dpipe.Connect(handle);
         }
-        public void Connect(string handleString, byte[]? connectData)
+        public void Connect(string handleString, byte[] connectData)
         {
             _dpipe.Connect(handleString, connectData);
         }
-        public void Connect(string handleString, string? connectMessage)
+        public void Connect(string handleString, string connectMessage)
         {
             _dpipe.Connect(handleString, connectMessage, _encoding);
         }
@@ -267,12 +272,12 @@ namespace CreatorDK.IO.DPipes
         {
             _dpipe.Connect(handleString);
         }
-        public void Disconnect(byte[]? disconnectData)
+        public void Disconnect(byte[] disconnectData)
         {
             _dpipe?.Disconnect(disconnectData);
         }
 
-        public void Disconnect(string? disconnectMessage)
+        public void Disconnect(string disconnectMessage)
         {
             _dpipe?.Disconnect(disconnectMessage, _encoding);
         }

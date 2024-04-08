@@ -1,13 +1,14 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFramework>net8.0</TargetFramework>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <Nullable>enable</Nullable>
+    <TargetFramework>netstandard2.0</TargetFramework>
   </PropertyGroup>
 
   <ItemGroup>
-	<PackageReference Include="CreatorDK.Diagnostics.Win32" Version="1.0.0" />
+    <PackageReference Include="CreatorDK.Diagnostics.Win32" Version="1.0.1" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\CreatorDK.IO.DPipes\CreatorDK.IO.DPipes.csproj" />
   </ItemGroup>
 

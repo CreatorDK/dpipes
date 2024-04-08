@@ -1,12 +1,20 @@
-﻿using System.IO.Pipes;
+﻿using System;
+using System.IO.Pipes;
 
 namespace CreatorDK.IO.DPipes
 {
-    public class PacketBuilder(int bufferHeaderSize = (int)Constants.PACKET_HEADER_SIZE)
+    public class PacketBuilder
     {
-        private readonly int _bufferHeaderSize = bufferHeaderSize;
-        private readonly byte[] _pBufferHeaderIn = new byte[bufferHeaderSize];
-        private readonly byte[] _pBufferHeaderOut = new byte[bufferHeaderSize];
+        private readonly int _bufferHeaderSize;
+        private readonly byte[] _pBufferHeaderIn;
+        private readonly byte[] _pBufferHeaderOut;
+
+        public PacketBuilder(int bufferHeaderSize = (int)Constants.PACKET_HEADER_SIZE)
+        {
+            _bufferHeaderSize = bufferHeaderSize;
+            _pBufferHeaderIn = new byte[bufferHeaderSize];
+            _pBufferHeaderOut = new byte[bufferHeaderSize];
+        }
 
         public PacketHeader GetPacketHeader(PipeStream pipeStream, DPipe dpipe) 
         {
@@ -52,7 +60,7 @@ namespace CreatorDK.IO.DPipes
             PrepareClientHeader(Constants.SERVICE_CODE_RAW_CLIENT, dataSize);
         }
 
-        public void WriteHeader(Stream pipeStream)
+        public void WriteHeader(PipeStream pipeStream)
         {
             pipeStream.Write(_pBufferHeaderOut, 0, _bufferHeaderSize);
         }

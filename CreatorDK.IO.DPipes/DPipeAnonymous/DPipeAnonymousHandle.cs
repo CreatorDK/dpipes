@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using System;
+using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -27,7 +28,7 @@ namespace CreatorDK.IO.DPipes
 
         private DPipeAnonymousHandle(string handleString)
         {
-            string readHandleString = handleString[..16];
+            string readHandleString = handleString.Substring(0, 16);
             string writeHandleString = handleString.Substring(19, 16);
 
             int readHandleInteger = int.Parse(readHandleString, NumberStyles.HexNumber);
@@ -53,12 +54,12 @@ namespace CreatorDK.IO.DPipes
 
         public static DPipeAnonymousHandle Create(string readHandleString, string writeHandleString)
         {
-            bool readHandleCorrect = int.TryParse(Encoding.UTF8.GetBytes(readHandleString), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _);
+            bool readHandleCorrect = int.TryParse(readHandleString, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _);
 
             if (!readHandleCorrect)
                 throw new ArgumentException("Invalid DPipeAnonymus Read Handle");
 
-            bool writeHandleCorrect = int.TryParse(Encoding.UTF8.GetBytes(writeHandleString), NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _);
+            bool writeHandleCorrect = int.TryParse(writeHandleString, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _);
 
             if (!writeHandleCorrect)
                 throw new ArgumentException("Invalid DPipeAnonymus Write Handle");
@@ -81,7 +82,9 @@ namespace CreatorDK.IO.DPipes
             return DPIPE_TYPE.ANONYMUS_PIPE;
         }
 
-        [GeneratedRegex("[0-9A-F]{16}:::[0-9A-F]{16}")]
-        private static partial Regex AnonymusHandleRegex();
+        public static Regex AnonymusHandleRegex()
+        {
+            return new Regex("[0-9A-F]{16}:::[0-9A-F]{16}");
+        }
     }
 }

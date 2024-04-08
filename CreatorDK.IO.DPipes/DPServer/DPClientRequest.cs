@@ -8,7 +8,7 @@ namespace CreatorDK.IO.DPipes
 {
     public class DPClientRequest
     {
-        public DPClientRequest(Guid guid, int code, int dataType, byte[]? data)
+        public DPClientRequest(Guid guid, int code, int dataType, byte[] data)
         {
             _guid = guid;
             _code = code;
@@ -19,12 +19,12 @@ namespace CreatorDK.IO.DPipes
         private Guid _guid;
         private int _code;
         private int _dataType;
-        private byte[]? _data;
+        private byte[] _data;
 
         public Guid Guid => _guid;
         public int Code => _code;
         public int DataType => _dataType;
-        public byte[]? Data => _data;
+        public byte[] Data => _data;
 
         public DPClientResponse CreateResponse()
         {

@@ -1,5 +1,6 @@
 ﻿using CreatorDK.Diagnostics.Win32;
 using Microsoft.Win32.SafeHandles;
+using System;
 using System.Runtime.InteropServices;
 
 namespace CreatorDK.IO.DPipes.Win32
@@ -12,7 +13,7 @@ namespace CreatorDK.IO.DPipes.Win32
 
             else if (pipe is DPipeAnonymus pipeAnonymus)
             {
-                SECURITY_ATTRIBUTES securityAttribute = new()
+                SECURITY_ATTRIBUTES securityAttribute = new SECURITY_ATTRIBUTES()
                 {
                     bInheritHandle = 1
                 };
@@ -39,10 +40,10 @@ namespace CreatorDK.IO.DPipes.Win32
                     throw new Exception("Unable to create read anonymus pipe");
                 }
 
-                SafePipeHandle serverReadSafePipeHandle = new(serverReadPipeHandle, true);
-                SafePipeHandle clientWriteSafePipeHandle = new(clientWritePipeHandle, true);
-                SafePipeHandle serverWriteSafePipeHandle = new(serverWritePipeHandle, true);
-                SafePipeHandle clientReadSafePipeHandle = new(clientReadPipeHandle, true);
+                SafePipeHandle serverReadSafePipeHandle = new SafePipeHandle(serverReadPipeHandle, true);
+                SafePipeHandle clientWriteSafePipeHandle = new SafePipeHandle(clientWritePipeHandle, true);
+                SafePipeHandle serverWriteSafePipeHandle = new SafePipeHandle(serverWritePipeHandle, true);
+                SafePipeHandle clientReadSafePipeHandle = new SafePipeHandle(clientReadPipeHandle, true);
 
                 pipeAnonymus.Start(serverReadSafePipeHandle, clientWriteSafePipeHandle, serverWriteSafePipeHandle, clientReadSafePipeHandle);
             }
@@ -51,7 +52,7 @@ namespace CreatorDK.IO.DPipes.Win32
             {
                 var namedPipe = (DPipeNamed)pipe;
 
-                SECURITY_ATTRIBUTES securityAttribute = new()
+                SECURITY_ATTRIBUTES securityAttribute = new SECURITY_ATTRIBUTES()
                 {
                     bInheritHandle = 0
                 };
@@ -60,12 +61,12 @@ namespace CreatorDK.IO.DPipes.Win32
 
                 IntPtr serverReadPipeHandle = NamedPipeWin32.CreateNamedPipeW(
                     serverReadPipeName,
-                    (nint)PipeOpenMode.PIPE_ACCESS_DUPLEX,
-                    (nint)PipeMode.PIPE_READMODE_BYTE,
-                    namedPipe.MaxInstances,
-                    namedPipe.OutBufferSize,
-                    namedPipe.InBufferSize,
-                    namedPipe.DefaultTimeout,
+                    (IntPtr)PipeOpenMode.PIPE_ACCESS_DUPLEX,
+                    (IntPtr)PipeMode.PIPE_READMODE_BYTE,
+                    (IntPtr)namedPipe.MaxInstances,
+                    (IntPtr)namedPipe.OutBufferSize,
+                    (IntPtr)namedPipe.InBufferSize,
+                    (IntPtr)namedPipe.DefaultTimeout,
                     ref securityAttribute
                     );
 
@@ -76,20 +77,20 @@ namespace CreatorDK.IO.DPipes.Win32
 
                 IntPtr serverWritePipeHandle = NamedPipeWin32.CreateNamedPipeW(
                     serverWritePipeName,
-                    (nint)PipeOpenMode.PIPE_ACCESS_DUPLEX,
-                    (nint)PipeMode.PIPE_TYPE_BYTE,
-                    namedPipe.MaxInstances,
-                    namedPipe.OutBufferSize,
-                    namedPipe.InBufferSize,
-                    namedPipe.DefaultTimeout,
+                    (IntPtr)PipeOpenMode.PIPE_ACCESS_DUPLEX,
+                    (IntPtr)PipeMode.PIPE_TYPE_BYTE,
+                    (IntPtr)namedPipe.MaxInstances,
+                    (IntPtr)namedPipe.OutBufferSize,
+                    (IntPtr)namedPipe.InBufferSize,
+                    (IntPtr)namedPipe.DefaultTimeout,
                     ref securityAttribute
                     );
 
                 if ((uint)serverWritePipeHandle == HandleConstants.INVALID_HANDLE_VALUE)
                     throw new Exception($"Unable to create write named pipe. Code: {Marshal.GetLastWin32Error()}");
 
-                SafePipeHandle serverReadSafePipeHandle = new(serverReadPipeHandle, true);
-                SafePipeHandle serverWriteSafePipeHandle = new(serverWritePipeHandle, true);
+                SafePipeHandle serverReadSafePipeHandle = new SafePipeHandle(serverReadPipeHandle, true);
+                SafePipeHandle serverWriteSafePipeHandle = new SafePipeHandle(serverWritePipeHandle, true);
 
                 namedPipe.Start(serverReadSafePipeHandle, serverWriteSafePipeHandle);
             }

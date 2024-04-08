@@ -1,18 +1,20 @@
-﻿namespace CreatorDK.IO.DPipes
+﻿using System;
+
+namespace CreatorDK.IO.DPipes
 {
     public class DPResponse
     {
         private int _code;
         private int _dataType;
-        private byte[]? _data;
+        private byte[] _data;
         public int Code => _code;
         public int DataType => _dataType;
-        public byte[]? Data => _data;
+        public byte[] Data => _data;
 
-        private TimeSpan _send_duraction = new();
-        private TimeSpan _request_duraction = new();
+        private TimeSpan _send_duraction = new TimeSpan();
+        private TimeSpan _request_duraction = new TimeSpan();
 
-        public DPResponse(int code, int dataType, byte[]? data)
+        public DPResponse(int code, int dataType, byte[] data)
         {
             _code = code;
             _dataType = dataType;

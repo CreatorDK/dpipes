@@ -1,5 +1,7 @@
-﻿using System.IO.Pipes;
+﻿using System;
+using System.IO.Pipes;
 using System.Text;
+using System.Threading;
 
 namespace CreatorDK.IO.DPipes
 {
@@ -22,16 +24,16 @@ namespace CreatorDK.IO.DPipes
         protected readonly string _name;
         protected DPIPE_MODE _mode = DPIPE_MODE.UNSTARTED;
 
-        protected PipeStream? _readPipeStream;
-        protected PipeStream? _writePipeStream;
+        protected PipeStream _readPipeStream;
+        protected PipeStream _writePipeStream;
 
         protected PacketBuilder _packetPuilder;
 
         protected int _bytesRead = 0;
         protected int _bytesToRead = 0;
 
-        protected Thread? _readThread = null;
-        protected Thread? _serviceThread = null;
+        protected Thread _readThread = null;
+        protected Thread _serviceThread = null;
 
         protected int _inBufferSize;
         protected int _outBufferSize;
@@ -43,9 +45,9 @@ namespace CreatorDK.IO.DPipes
         protected int _skipBufferSize = 4096;
         protected byte[] _skipBuffer;
 
-        public Action<PacketHeader>? OnClientConnectCallback { get; set; }
-        public Action<PacketHeader>? OnOtherSideDisconnectCallback { get; set; }
-        public Action<PacketHeader>? OnPacketHeaderReceivedCallback { get; set; }
+        public Action<PacketHeader> OnClientConnectCallback { get; set; }
+        public Action<PacketHeader> OnOtherSideDisconnectCallback { get; set; }
+        public Action<PacketHeader> OnPacketHeaderReceivedCallback { get; set; }
 
         public int InBufferSize => _inBufferSize;
         public int OutBufferSize => _outBufferSize;
@@ -54,8 +56,8 @@ namespace CreatorDK.IO.DPipes
         public string Name => _name;
         public int BytesToRead => _bytesToRead;
         public bool IsAlive => _isAlive;
-        public PipeStream? ReadPipeStream => _readPipeStream;
-        public PipeStream? WritePipeStream => _writePipeStream;
+        public PipeStream ReadPipeStream => _readPipeStream;
+        public PipeStream WritePipeStream => _writePipeStream;
         protected DPipe(string name, int inBufferSize, int outBufferSize)
         {
             _name = name;
@@ -115,10 +117,10 @@ namespace CreatorDK.IO.DPipes
 
         }
         public abstract int Read(byte[] buffer, int offset, int count);
-        public virtual byte[]? Read(PacketHeader header, int offset = 0)
+        public virtual byte[] Read(PacketHeader header, int offset = 0)
         {
             int bytesToRead = header.DataSize - offset;
-            byte[]? data = null;
+            byte[] data = null;
 
             if (bytesToRead > 0)
             {
@@ -140,31 +142,31 @@ namespace CreatorDK.IO.DPipes
         public abstract string GetHandleString();
         public abstract void Start();
         public abstract void Connect(IDPipeHandle dPipeHandle);
-        public abstract void Connect(IDPipeHandle dPipeHandle, byte[]? connectData);
-        public virtual void Connect(IDPipeHandle dPipeHandle, string? connectMessage, Encoding? encoding = null)
+        public abstract void Connect(IDPipeHandle dPipeHandle, byte[] connectData);
+        public virtual void Connect(IDPipeHandle dPipeHandle, string connectMessage, Encoding encoding = null)
         {
-            encoding ??= Encoding.Default;
+            encoding = encoding == null ? Encoding.Default : encoding;
 
-            byte[]? connectData = null;
+            byte[] connectData = null;
             if (!string.IsNullOrEmpty(connectMessage))
                 connectData = encoding.GetBytes(connectMessage);
 
             Connect(dPipeHandle, connectData);
         }
         public abstract void Connect(string handleString);
-        public abstract void Connect(string handleString, byte[]? data);
-        public virtual void Connect(string handleString, string? connectMessage, Encoding? encoding = null)
+        public abstract void Connect(string handleString, byte[] data);
+        public virtual void Connect(string handleString, string connectMessage, Encoding encoding = null)
         {
-            encoding ??= Encoding.Default;
+            encoding = encoding == null ? Encoding.Default : encoding;
 
-            byte[]? connectData = null;
+            byte[] connectData = null;
 
             if (connectMessage != null)
                 connectData = encoding.GetBytes(connectMessage);
 
             Connect(handleString, connectData);
         }
-        public virtual void Disconnect(byte[]? disconnectData)
+        public virtual void Disconnect(byte[] disconnectData)
         {
             if (_mode == DPIPE_MODE.UNSTARTED)
                 return;
@@ -190,11 +192,11 @@ namespace CreatorDK.IO.DPipes
         {
             Disconnect(null);
         }
-        public virtual void Disconnect(string? disconnectMessage, Encoding? encoding = null)
+        public virtual void Disconnect(string disconnectMessage, Encoding encoding = null)
         {
-            encoding ??= Encoding.Default;
+            encoding = encoding == null ? Encoding.Default : encoding;
 
-            byte[]? disonnectData = null;
+            byte[] disonnectData = null;
 
             if (!string.IsNullOrEmpty(disconnectMessage))
                 disonnectData = encoding.GetBytes(disconnectMessage);

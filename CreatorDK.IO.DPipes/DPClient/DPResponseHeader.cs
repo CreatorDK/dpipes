@@ -1,4 +1,6 @@
-﻿namespace CreatorDK.IO.DPipes
+﻿using System;
+
+namespace CreatorDK.IO.DPipes
 {
     public struct DPResponseHeader
     {

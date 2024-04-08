@@ -2,7 +2,7 @@
   "profiles": {
     "DPipeTestCS": {
       "commandName": "Project",
-      "commandLineArgs": "server named Test15"
+      "commandLineArgs": "server all all"
     }
   }
 }

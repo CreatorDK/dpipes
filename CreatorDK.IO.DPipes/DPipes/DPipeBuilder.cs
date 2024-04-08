@@ -4,43 +4,56 @@ namespace CreatorDK.IO.DPipes
 {
     public static class DPipeBuilder
     {
-        public static DPipe? Create(DPIPE_TYPE pipeType, int inBufferSize, int outBufferSize)
+        public static DPipe Create(DPIPE_TYPE pipeType, int inBufferSize, int outBufferSize)
         {
-            return pipeType switch
+            switch (pipeType)
             {
-                DPIPE_TYPE.ANONYMUS_PIPE => new DPipeAnonymus(inBufferSize, outBufferSize),
-                DPIPE_TYPE.NAMED_PIPE => new DPipeNamed(inBufferSize, outBufferSize),
-                _ => null,
-            };
+                case DPIPE_TYPE.ANONYMUS_PIPE:
+                    return new DPipeAnonymus(inBufferSize, outBufferSize);
+                case DPIPE_TYPE.NAMED_PIPE:
+                    return new DPipeNamed(inBufferSize, outBufferSize);
+                default:
+                    return null;
+            }
         }
-        public static DPipe? Create(DPIPE_TYPE pipeType, string name)
+        public static DPipe Create(DPIPE_TYPE pipeType, string name)
         {
-            return pipeType switch
+            switch (pipeType)
             {
-                DPIPE_TYPE.ANONYMUS_PIPE => new DPipeAnonymus(name),
-                DPIPE_TYPE.NAMED_PIPE => DPipeNamed.Create(name),
-                _ => null,
-            };
+                case DPIPE_TYPE.ANONYMUS_PIPE:
+                    return new DPipeAnonymus(name);
+                case DPIPE_TYPE.NAMED_PIPE:
+                    return DPipeNamed.Create(name);
+                default:
+                    return null;
+            }
         }
-        public static DPipe? Create(DPIPE_TYPE pipeType, string name, int inBufferSize, int outBufferSize)
+        public static DPipe Create(DPIPE_TYPE pipeType, string name, int inBufferSize, int outBufferSize)
         {
-            return pipeType switch
+            switch (pipeType)
             {
-                DPIPE_TYPE.ANONYMUS_PIPE => new DPipeAnonymus(name, inBufferSize, outBufferSize),
-                DPIPE_TYPE.NAMED_PIPE => DPipeNamed.Create(name, inBufferSize, outBufferSize),
-                _ => null,
-            };
+                case DPIPE_TYPE.ANONYMUS_PIPE:
+                    return new DPipeAnonymus(name, inBufferSize, outBufferSize);
+                case DPIPE_TYPE.NAMED_PIPE:
+                    return DPipeNamed.Create(name, inBufferSize, outBufferSize);
+                default:
+                    return null;
+            }
+
         }
-        public static DPipe? Create(DPIPE_TYPE pipeType)
+        public static DPipe Create(DPIPE_TYPE pipeType)
         {
-            return pipeType switch
+            switch (pipeType)
             {
-                DPIPE_TYPE.ANONYMUS_PIPE => new DPipeAnonymus(),
-                DPIPE_TYPE.NAMED_PIPE => new DPipeNamed(),
-                _ => null,
-            };
+                case DPIPE_TYPE.ANONYMUS_PIPE:
+                    return new DPipeAnonymus();
+                case DPIPE_TYPE.NAMED_PIPE:
+                    return new DPipeNamed();
+                default:
+                    return null;
+            }
         }
-        public static DPipe? Create(string pipeHandle, int inBufferSize, int outBufferSize, bool connect = false)
+        public static DPipe Create(string pipeHandle, int inBufferSize, int outBufferSize, bool connect = false)
         {
             if (DPipeAnonymousHandle.IsAnonymus(pipeHandle))
             {
@@ -60,7 +73,7 @@ namespace CreatorDK.IO.DPipes
             else
                 return null;
         }
-        public static DPipe? Create(string pipeHandle, string name, int inBufferSize, int outBufferSize, bool connect = false)
+        public static DPipe Create(string pipeHandle, string name, int inBufferSize, int outBufferSize, bool connect = false)
         {
             if (DPipeAnonymousHandle.IsAnonymus(pipeHandle))
             {
@@ -80,7 +93,7 @@ namespace CreatorDK.IO.DPipes
             else
                 return null;
         }
-        public static DPipe? Create(string pipeHandle, string name, bool connect = false)
+        public static DPipe Create(string pipeHandle, string name, bool connect = false)
         {
             if (DPipeAnonymousHandle.IsAnonymus(pipeHandle))
             {
@@ -100,7 +113,7 @@ namespace CreatorDK.IO.DPipes
             else
                 return null;
         }
-        public static DPipe? Create(string pipeHandle, bool connect = false)
+        public static DPipe Create(string pipeHandle, bool connect = false)
         {
             if (DPipeAnonymousHandle.IsAnonymus(pipeHandle))
             {
