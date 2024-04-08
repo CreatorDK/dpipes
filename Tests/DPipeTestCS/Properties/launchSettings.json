@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "DPipeTestCS": {
+      "commandName": "Project",
+      "commandLineArgs": "server named Test15"
+    }
+  }
+}

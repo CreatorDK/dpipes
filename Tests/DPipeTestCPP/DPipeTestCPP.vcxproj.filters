@@ -1,0 +1,228 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Исходные файлы">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Файлы заголовков">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="Файлы ресурсов">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="Исходные файлы\dpipes">
+      <UniqueIdentifier>{62273880-0a8d-4493-8c81-3a9a84e19252}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\dpipes">
+      <UniqueIdentifier>{c834ef53-46ac-48e5-8d6a-e586ebe92567}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\dpipe_client_tests">
+      <UniqueIdentifier>{c50b8c61-ca48-4105-a3fa-7491d9383af4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\dpipe_server_tests">
+      <UniqueIdentifier>{58251f8a-a246-439d-88e8-3853e5a29847}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Исходные файлы\triggers">
+      <UniqueIdentifier>{6e8b6681-e420-40aa-a36e-a3f67a3187a7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\trigger">
+      <UniqueIdentifier>{9fc1be48-ca87-4577-8c98-bd0131eaf0cb}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dpipetest.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="common.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_tests.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_tests.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test1.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test1.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test2.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test2.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test3.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test3.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test4.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test5.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test6.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test7.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test8.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test9.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test10.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test11.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test12.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test14.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test13.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test4.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test5.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test6.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test7.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test8.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test9.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test10.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test11.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test12.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test13.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test14.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test15.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test15.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test16.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test16.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="triggers.cpp">
+      <Filter>Исходные файлы\triggers</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test17.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_client_test17.cpp">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpclient.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpipe.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpipea.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpipebase.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpipen.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpipepacket.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpmessanger.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpserver.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpstring.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\DPipeSourceCPP\impl\dpwstring.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="common.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="dpipe_client_tests.h">
+      <Filter>Исходные файлы\dpipe_client_tests</Filter>
+    </ClInclude>
+    <ClInclude Include="dpipe_server_tests.h">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClInclude>
+    <ClInclude Include="triggers.h">
+      <Filter>Файлы заголовков\trigger</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpclient.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpipe.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpipea.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpipebase.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpipen.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpipepacket.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpmessanger.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpserver.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpstring.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\DPipeSourceCPP\dpwstring.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
