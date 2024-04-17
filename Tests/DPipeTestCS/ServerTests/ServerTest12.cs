@@ -1,6 +1,7 @@
 ﻿using CreatorDK.IO.DPipes;
 using CreatorDK.IO.DPipes.Win32;
 using CreatorDK.Triggers;
+using System.Reflection.PortableExecutable;
 using System.Text;
 using static System.Runtime.InteropServices.JavaScript.JSType;
 
@@ -12,16 +13,16 @@ namespace DPipeTestCS.ServerTests
         public ServerTest12(string testName, string title, string description) : base(testName, title, description) { }
 
         DPipe? _dpipe;
-        DPServer _dpserver;
+        DPServer? _dpserver;
 
         BoolTrigger lastRequestTrigger = new();
         BoolTrigger messagesReceivedTrigger = new();
 
-        void OnClientConnect(byte[]? data)
+        void OnClientConnect(PacketHeader header)
         {
-            if (data != null && data.Length > 0)
+            if (header.DataSize > 0 && _dpserver != null)
             {
-                string message = _dpserver.Encoding.GetString(data);
+                var message = _dpserver.GetString(header);
                 WriteLine($"1. Client Connected with message: {message}");
             }
             else
@@ -30,11 +31,11 @@ namespace DPipeTestCS.ServerTests
             }
         }
 
-        void OnClientDisonnect(byte[]? data)
+        void OnClientDisonnect(PacketHeader header)
         {
-            if (data != null && data.Length > 0)
+            if (header.DataSize > 0 && _dpserver != null)
             {
-                string message = _dpserver.Encoding.GetString(data);
+                string message = _dpserver.GetString(header);
                 WriteLine($"21. Client Disconnected with message: {message}");
             }
             else
@@ -51,7 +52,7 @@ namespace DPipeTestCS.ServerTests
 
         void OnInfoDataReceived(byte[]? data)
         {
-            if (data != null && data.Length > 0)
+            if (data != null && data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(data);
                 if (message == "Info data from client")
@@ -67,7 +68,7 @@ namespace DPipeTestCS.ServerTests
 
         void OnWarningDataReceived(byte[]? data)
         {
-            if (data != null && data.Length > 0)
+            if (data != null && data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(data);
                 if (message == "Warning data from client")
@@ -83,7 +84,7 @@ namespace DPipeTestCS.ServerTests
 
         void OnErrorDataReceived(byte[]? data)
         {
-            if (data != null && data.Length > 0)
+            if (data != null && data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(data);
                 if (message == "Error data from client")
@@ -93,9 +94,9 @@ namespace DPipeTestCS.ServerTests
             }
         }
 
-        void HandleCode1(DPClientRequest request)
+        void HandleCode1(DPReceivedRequest request)
         {
-            if (request.Data != null && request.Data.Length > 0)
+            if (request.Data != null && request.Data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(request.Data);
                 WriteLine($"14. Received request (handler 1): {message}");
@@ -106,9 +107,9 @@ namespace DPipeTestCS.ServerTests
                 _dpserver.SendResponse(request, response);
             }
         }
-        void HandleCode2(DPClientRequest request)
+        void HandleCode2(DPReceivedRequest request)
         {
-            if (request.Data != null && request.Data.Length > 0)
+            if (request.Data != null && request.Data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(request.Data);
                 WriteLine($"15. Received request (handler 2): {message}");
@@ -119,9 +120,9 @@ namespace DPipeTestCS.ServerTests
                 _dpserver.SendResponse(request, response);
             }
         }
-        void HandleCode3(DPClientRequest request)
+        void HandleCode3(DPReceivedRequest request)
         {
-            if (request.Data != null && request.Data.Length > 0)
+            if (request.Data != null && request.Data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(request.Data);
                 WriteLine($"16. Received request (handler 3): {message}");
@@ -132,9 +133,9 @@ namespace DPipeTestCS.ServerTests
                 _dpserver.SendResponse(request, response);
             }
         }
-        void HandleCode4(DPClientRequest request)
+        void HandleCode4(DPReceivedRequest request)
         {
-            if (request.Data != null && request.Data.Length > 0)
+            if (request.Data != null && request.Data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(request.Data);
                 WriteLine($"17. Received request (handler 4): {message}");
@@ -145,9 +146,9 @@ namespace DPipeTestCS.ServerTests
                 _dpserver.SendResponse(request, response);
             }
         }
-        void HandleCode5(DPClientRequest request)
+        void HandleCode5(DPReceivedRequest request)
         {
-            if (request.Data != null && request.Data.Length > 0)
+            if (request.Data != null && request.Data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(request.Data);
                 WriteLine($"18. Received request (handler 5): {message}");
@@ -158,9 +159,9 @@ namespace DPipeTestCS.ServerTests
                 _dpserver.SendResponse(request, response);
             }
         }
-        void HandleCode6(DPClientRequest request)
+        void HandleCode6(DPReceivedRequest request)
         {
-            if (request.Data != null && request.Data.Length > 0)
+            if (request.Data != null && request.Data.Length > 0 && _dpserver != null)
             {
                 string message = _dpserver.Encoding.GetString(request.Data);
                 WriteLine($"19. Received request (handler 6): {message}");
@@ -171,9 +172,9 @@ namespace DPipeTestCS.ServerTests
                 _dpserver.SendResponse(request, response);
             }
         }
-        void HandleCode7(DPClientRequest request)
+        void HandleCode7(DPReceivedRequest request)
         {
-            if (request.Data != null && request.Data.Length > 0)
+            if (request.Data != null && request.Data.Length > 0 && _dpserver != null)
             {
                 string threadIdString = _dpserver.Encoding.GetString(request.Data);
                 if (NewConsole)
@@ -184,9 +185,9 @@ namespace DPipeTestCS.ServerTests
                 _dpserver.SendResponse(request, response);
             }
         }
-        void HandleCode8(DPClientRequest request)
+        void HandleCode8(DPReceivedRequest request)
         {
-            if (request.Data != null && request.Data.Length > 0)
+            if (request.Data != null && request.Data.Length > 0 && _dpserver != null)
             {
                 string threadIdString = _dpserver.Encoding.GetString(request.Data);
                 if (NewConsole)
@@ -197,8 +198,11 @@ namespace DPipeTestCS.ServerTests
                 _dpserver.SendResponse(request, response);
             }
         }
-        void HandleCode9(DPClientRequest request)
+        void HandleCode9(DPReceivedRequest request)
         {
+            if (_dpserver == null)
+                return;
+
             WriteLine("20. Received last request (handler 9)");
             var response = request.CreateResponse();
             response.Code = 9;

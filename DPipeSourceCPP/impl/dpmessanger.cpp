@@ -3,220 +3,129 @@
 using namespace std;
 using namespace crdk::dpipes;
 
-//DPMessageReceivedAsyncData implementation
-#pragma region DPMessageReceivedAsyncData
-	DPMessageReceivedAsyncData::DPMessageReceivedAsyncData(IDPipeMessanger* messangerPtr, PacketHeader packetHeader, std::shared_ptr<HeapAllocatedData> heapData) :
-		header(packetHeader) {
-		messanger = messangerPtr;
-		data = heapData;
-	}
-#pragma endregion DPMessageReceivedAsyncData
+DPMessanger::DPMessanger(IDPipe* dpipe, bool handleAsync) :
+	IDPipeMessanger(dpipe)
+{
+	_handleAsync = handleAsync;
+	_dpipe->SetClientConnectCallback([this](IDPipe* pipe, PacketHeader header) { OnClientConnect(pipe, header); });
+	_dpipe->SetOtherSideDisconnectCallback([this](IDPipe* pipe, PacketHeader header) { OnOtherSideDisconnect(pipe, header); });
+	_dpipe->SetPacketHeaderRecevicedCallback([this](IDPipe* pipe, PacketHeader header) { OnDataReceive(pipe, header); });
+}
 
-//DPMessageStringReceivedAsyncData implementation
-#pragma region DPMessageStringReceivedAsyncData
-	DPMessageStringReceivedAsyncData::DPMessageStringReceivedAsyncData(IDPipeMessanger* messangerPtr, PacketHeader packetHeader, std::wstring messageString) :
-		header(packetHeader) {
-		messanger = messangerPtr;
-		message = messageString;
-	}
-#pragma endregion DPMessageStringReceivedAsyncData
+DPMessanger::~DPMessanger() {
+	_dpipe->SetClientConnectCallback({});
+	_dpipe->SetOtherSideDisconnectCallback({});
+	_dpipe->SetPacketHeaderRecevicedCallback({});
+}
 
-//IDPipeMessanger implementation
-#pragma region IDPipeMessanger
-	IDPipeMessanger::IDPipeMessanger(IDPipe* dpipe, DWORD nBufferStringSize) {
-		_dpipe = dpipe;
+void DPMessanger::OnClientConnect(IDPipe* pipe, PacketHeader header) {
+	
+	if (_onClientConnected) {
+		DWORD dataSize = header.DataSize();
+		auto heapData = make_shared<HeapAllocatedData>(dataSize, false);
 
-		if (_dpipe == nullptr)
-			return;
-
-		_nBufferStringSize = nBufferStringSize;
-		_pBufferString = (wchar_t*)(new char[_nBufferStringSize]);
-	}
-
-	IDPipeMessanger::~IDPipeMessanger() {
-		delete[] _pBufferString;
-	}
-
-	void IDPipeMessanger::ChekBufferSize(DWORD nBytes) {
-		if (nBytes > _nBufferStringSize) {
-			delete[] _pBufferString;
-			_nBufferStringSize = nBytes + (nBytes / 2);
-			_pBufferString = (wchar_t*)(new char[_nBufferStringSize]);
-		}
-	}
-
-	wstring IDPipeMessanger::GetStringFromPipe(DWORD sizeInBytes) {
-		if (sizeInBytes > 0) {
-			ChekBufferSize(sizeInBytes);
-
+		if (dataSize > 0) {
+			void* buffer = heapData.get()->data();
 			DWORD nBytesRead;
-			_dpipe->Read(_pBufferString, sizeInBytes, &nBytesRead, NULL);
-			_pBufferString[sizeInBytes / sizeof(wchar_t)] = '\0';
+			_dpipe->Read(buffer, header.DataSize(), &nBytesRead, NULL);
+		}
 
-			return wstring(_pBufferString);
+		_onClientConnected(pipe, header, heapData);
+	}
+}
+
+void DPMessanger::OnOtherSideDisconnect(IDPipe* pipe, PacketHeader header) {
+	
+	if (_onOtherSideDisconnected) {
+		DWORD dataSize = header.DataSize();
+		auto heapData = make_shared<HeapAllocatedData>(dataSize, false);
+
+		if (dataSize > 0) {
+			void* buffer = heapData.get()->data();
+			DWORD nBytesRead;
+			_dpipe->Read(buffer, header.DataSize(), &nBytesRead, NULL);
+		}
+
+		_onOtherSideDisconnected(pipe, header, heapData);
+	}
+}
+
+void DPMessanger::OnDataReceive(IDPipe* pipe, PacketHeader header) {
+
+	DWORD nBytesRead;
+	//Get data code ignoring first 8 bits (using for encoding)
+	DWORD dataCode = header.GetDataCodeOnly();
+	bool isStringData = dataCode & 0x01;
+
+	DWORD dataSize = header.DataSize();
+	auto heapData = make_shared<HeapAllocatedData>(dataSize, false);
+
+	if (dataSize > 0) {
+		void* buffer = heapData.get()->data();
+		_dpipe->Read(buffer, header.DataSize(), &nBytesRead, NULL);
+	}
+
+	//If data is string
+	if (isStringData) {
+
+		if (_handleAsync) {
+			DWORD _nReadThreadId;
+			DPMessageReceivedAsyncData* sendData = new DPMessageReceivedAsyncData(this, header, heapData, _dpipe);
+			auto _tHandleThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)OnMessageStringReceivedAsync, (LPVOID)sendData, 0, &_nReadThreadId);
 		}
 		else {
-			return L"";
+			OnMessageStringReceived(_dpipe, header, heapData);
 		}
 	}
-
-	void IDPipeMessanger::OnMessageReceived(PacketHeader& header, shared_ptr<HeapAllocatedData> heapData) {
-
-		switch (header.GetCommand())
-		{
-		case DP_MESSAGE_DATA:
-			if (_onMessageDataReceived)
-				_onMessageDataReceived(heapData);
-			break;
-		case DP_INFO_DATA:
-			if (_onInfoDataReceived)
-				_onInfoDataReceived(heapData);
-			break;
-		case DP_WARNING_DATA:
-			if (_onWarningDataReceived)
-				_onWarningDataReceived(heapData);
-			break;
-		case DP_ERROR_DATA:
-			if (_onErrorDataReceived)
-				_onErrorDataReceived(heapData);
-			break;
+	//If data is binary
+	else if (dataCode > 0) {
+		if (_handleAsync) {
+			DWORD _nReadThreadId;
+			DPMessageReceivedAsyncData* sendData = new DPMessageReceivedAsyncData(this, header, heapData, _dpipe);
+			auto _tHandleThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)OnMessageStringReceivedAsync, (LPVOID)sendData, 0, &_nReadThreadId);
+		}
+		else {
+			OnMessageReceived(_dpipe, header, heapData);
 		}
 	}
-
-	void IDPipeMessanger::OnMessageReceivedAsync(LPVOID dataPtr) {
-		auto messageData = (DPMessageReceivedAsyncData*)dataPtr;
-		IDPipeMessanger* messanger = messageData->messanger;
-		messanger->OnMessageReceived(messageData->header, messageData->data);
-		delete messageData;
+	else {
+		if (_onMessageStringReceived)
+			_onMessageStringReceived(pipe, header, heapData);
 	}
+}
 
-	void IDPipeMessanger::OnMessageStringReceived(PacketHeader& header, wstring stringMessage) {
-		switch (header.GetCommand())
-		{
-		case DP_MESSAGE_STRING:
-			if (_onMessageStringReceived)
-				_onMessageStringReceived(stringMessage);
-			break;
-		case DP_INFO_STRING:
-			if (_onInfoStringReceived)
-				_onInfoStringReceived(stringMessage);
-			break;
-		case DP_WARNING_STRING:
-			if (_onWarningStringReceived)
-				_onWarningStringReceived(stringMessage);
-			break;
-		case DP_ERROR_STRING:
-			if (_onErrorStringReceived)
-				_onErrorStringReceived(stringMessage);
-			break;
-		}
-	}
+bool DPMessanger::Connect(IDPipeHandle* pHandle) {
+	return _dpipe->Connect(pHandle);
+}
 
-	void IDPipeMessanger::OnMessageStringReceivedAsync(LPVOID dataPtr) {
-		auto messageData = (DPMessageStringReceivedAsyncData*)dataPtr;
-		IDPipeMessanger* messanger = messageData->messanger;
-		messanger->OnMessageStringReceived(messageData->header, messageData->message);
-		delete messageData;
-	}
+bool DPMessanger::Connect(IDPipeHandle* pHandle, std::string message) {
+	DWORD len = boost::numeric_cast<DWORD>(message.length());
+	return _dpipe->Connect(pHandle, message.data(), len, DP_ENCODING_UTF8);
+}
 
-	bool IDPipeMessanger::SendMSG(const wstring message) {
-		DWORD nBytesWritten;
-		DWORD len = boost::numeric_cast<DWORD>(message.length() * sizeof(wchar_t));
-		_mutexWritePipe.lock();
-			bool bReturn = _dpipe->Write(DP_MESSAGE_STRING, message.data(), len, &nBytesWritten);
-		_mutexWritePipe.unlock();
-		return bReturn;
-	}
+bool DPMessanger::Connect(IDPipeHandle* pHandle, std::wstring message) {
+	DWORD len = boost::numeric_cast<DWORD>(message.length() * sizeof(wchar_t));
+	return _dpipe->Connect(pHandle, message.data(), len, DP_ENCODING_UNICODE);
+}
 
-	bool IDPipeMessanger::SendMSG(void* data, DWORD dataSize) {
-		DWORD nBytesWritten;
-		_mutexWritePipe.lock();
-			bool bReturn = _dpipe->Write(DP_MESSAGE_DATA, data, dataSize, &nBytesWritten);
-		_mutexWritePipe.unlock();
-		return bReturn;
-	}
+bool DPMessanger::Connect(const std::wstring handleString) {
+	return _dpipe->Connect(handleString);
+}
 
-	bool IDPipeMessanger::SendInfo(const wstring message) {
-		DWORD nBytesWritten;
-		DWORD len = boost::numeric_cast<DWORD>(message.length() * sizeof(wchar_t));
-		_mutexWritePipe.lock();
-			bool bReturn = _dpipe->Write(DP_INFO_STRING, message.data(), len, &nBytesWritten);
-		_mutexWritePipe.unlock();
-		return bReturn;
-	}
+bool DPMessanger::Connect(const std::wstring handleString, std::string message) {
+	DWORD len = boost::numeric_cast<DWORD>(message.length());
+	return _dpipe->Connect(handleString, message.data(), len, DP_ENCODING_UTF8);
+}
 
-	bool IDPipeMessanger::SendInfo(void* data, DWORD dataSize) {
-		DWORD nBytesWritten;
-		_mutexWritePipe.lock();
-			bool bReturn = _dpipe->Write(DP_INFO_DATA, data, dataSize, &nBytesWritten);
-		_mutexWritePipe.unlock();
-		return bReturn;
-	}
+bool DPMessanger::Connect(const std::wstring handleString, std::wstring message) {
+	DWORD len = boost::numeric_cast<DWORD>(message.length() * sizeof(wchar_t));
+	return _dpipe->Connect(handleString, message.data(), len, DP_ENCODING_UNICODE);
+}
 
-	bool IDPipeMessanger::SendWarning(const wstring message) {
-		DWORD nBytesWritten;
-		DWORD len = boost::numeric_cast<DWORD>(message.length() * sizeof(wchar_t));
-		_mutexWritePipe.lock();
-			bool bReturn = _dpipe->Write(DP_WARNING_STRING, message.data(), len, &nBytesWritten);
-		_mutexWritePipe.unlock();
-		return bReturn;
-	}
+void DPMessanger::SetOnClientConnectHandler(function<void(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data)> function) {
+	_onClientConnected = function;
+}
 
-	bool IDPipeMessanger::SendWarning(void* data, DWORD dataSize) {
-		DWORD nBytesWritten;
-		_mutexWritePipe.lock();
-			bool bReturn = _dpipe->Write(DP_WARNING_DATA, data, dataSize, &nBytesWritten);
-		_mutexWritePipe.unlock();
-		return bReturn;
-	}
-
-	bool IDPipeMessanger::SendError(const wstring message) {
-		DWORD nBytesWritten;
-		DWORD len = boost::numeric_cast<DWORD>(message.length() * sizeof(wchar_t));
-		_mutexWritePipe.lock();
-			bool bReturn = _dpipe->Write(DP_ERROR_STRING, message.data(), len, &nBytesWritten);
-		_mutexWritePipe.unlock();
-		return bReturn;
-	}
-
-	bool IDPipeMessanger::SendError(void* data, DWORD dataSize) {
-		DWORD nBytesWritten;
-		_mutexWritePipe.lock();
-			bool bReturn = _dpipe->Write(DP_ERROR_DATA, data, dataSize, &nBytesWritten);
-		_mutexWritePipe.unlock();
-		return bReturn;
-	}
-
-	void IDPipeMessanger::SetMessageStringReceivedCallback(function<void(wstring)> function) {
-		_onMessageStringReceived = function;
-	}
-
-	void IDPipeMessanger::SetMessageDataReceivedCallback(function<void(shared_ptr<HeapAllocatedData> data)> function) {
-		_onMessageDataReceived = function;
-	}
-
-	void IDPipeMessanger::SetInfoStringReceivedCallback(function<void(wstring)> function) {
-		_onInfoStringReceived = function;
-	}
-
-	void IDPipeMessanger::SetInfoDataReceivedCallback(function<void(shared_ptr<HeapAllocatedData> data)> function) {
-		_onInfoDataReceived = function;
-	}
-
-	void IDPipeMessanger::SetWarningStringReceivedCallback(function<void(wstring)> function) {
-		_onWarningStringReceived = function;
-	}
-
-	void IDPipeMessanger::SetWarningDataReceivedCallback(function<void(shared_ptr<HeapAllocatedData> data)> function) {
-		_onWarningDataReceived = function;
-	}
-
-	void IDPipeMessanger::SetErrorStringReceivedCallback(function<void(wstring)> function) {
-		_onErrorStringReceived = function;
-	}
-
-	void IDPipeMessanger::SetErrorDataReceivedCallback(function<void(shared_ptr<HeapAllocatedData> data)> function) {
-		_onErrorDataReceived = function;
-	}
-
-#pragma endregion IDPipeMessanger
+void DPMessanger::SetOnOtherSideDisconnectHandler(function<void(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data)> function) {
+	_onOtherSideDisconnected = function;
+}

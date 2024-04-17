@@ -8,11 +8,11 @@ namespace DPipeTestCS.ClientTests
     {
         public ClientTest17(string testName, string title, string description) : base(testName, title, description) { }
 
-        DPipeNamed? _dpipeNamed;
+        DPNamed? _dpipeNamed;
 
         public override void Execute(StartParamsClient startParams)
         {
-            _dpipeNamed = DPipeNamed.Create(startParams.PipeHandle);
+            _dpipeNamed = DPNamed.Create(startParams.PipeHandle);
             if (_dpipeNamed == null)
             {
                 WriteLine("Cannot create named pipe");

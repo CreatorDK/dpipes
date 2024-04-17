@@ -15,7 +15,7 @@ private:
 	BoolTrigger messageReceivedTrigger;
 	BoolTrigger serverDisconnectTrigger;
 
-	void PacketHeaderReceviced(PacketHeader header) {
+	void PacketHeaderReceviced(IDPipe* pipe, PacketHeader header) {
 		DWORD nBytesToRead = header.DataSize();
 		DWORD nBytesRead;
 		char* buf = (char*)malloc(nBytesToRead);
@@ -33,7 +33,7 @@ private:
 		messageReceivedTrigger.SetComplete();
 	}
 
-	void OnServerDisconnect(PacketHeader header) {
+	void OnServerDisconnect(IDPipe* pipe, PacketHeader header) {
 		WriteClientLine() << "4. Server Disconnecting" << END_LINE;
 		serverDisconnectTrigger.SetComplete();
 	}
@@ -51,8 +51,8 @@ public:
 		if (newConsole)
 			WriteTestName(_dpipe->Type());
 
-		_dpipe->SetPacketHeaderRecevicedCallback([this](PacketHeader header) { PacketHeaderReceviced(header); });
-		_dpipe->SetOtherSideDisconnectCallback([this](PacketHeader header) { OnServerDisconnect(header); });
+		_dpipe->SetPacketHeaderRecevicedCallback([this](IDPipe* pipe, PacketHeader header) { PacketHeaderReceviced(pipe, header); });
+		_dpipe->SetOtherSideDisconnectCallback([this](IDPipe* pipe, PacketHeader header) { OnServerDisconnect(pipe, header); });
 		WriteClientLine() << "1. Connecting to Pipe" << END_LINE;
 		_dpipe->Connect(params.handle);
 		wait(messageReceivedTrigger);

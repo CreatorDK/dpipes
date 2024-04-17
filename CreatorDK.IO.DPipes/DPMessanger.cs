@@ -3,23 +3,23 @@ using System.Threading.Tasks;
 
 namespace CreatorDK.IO.DPipes
 {
-    public class DPipeMessanger : DPipeMessangerBase
+    public class DPMessanger : DPMessangerBase
     {
         private bool _handleAsync;
 
-        public DPipeMessanger(DPipe dpipe, Encoding encoding, bool handleAsync = true, uint stringBufferSize = 4096) 
+        public DPMessanger(DPipe dpipe, Encoding encoding, bool handleAsync = true, uint stringBufferSize = 4096) 
             : base(dpipe, encoding, stringBufferSize) 
         {
             _handleAsync = handleAsync;
 
-            _dpipe.OnClientConnectCallback = OnClientConnectInner;
+            _dpipe.OnOtherSideConnectCallback = OnClientConnectInner;
             _dpipe.OnOtherSideDisconnectCallback = OnOtherSideDisconnectInner;
             _dpipe.OnPacketHeaderReceivedCallback = OnPacketHeaderReceivedInner;
         }
 
-        ~DPipeMessanger()
+        ~DPMessanger()
         {
-            _dpipe.OnClientConnectCallback = null;
+            _dpipe.OnOtherSideConnectCallback = null;
             _dpipe.OnOtherSideDisconnectCallback = null;
             _dpipe.OnPacketHeaderReceivedCallback = null;
         }
@@ -28,45 +28,55 @@ namespace CreatorDK.IO.DPipes
         public StringRecevivedHandler OnClientConnect { get; set; }
         public StringRecevivedHandler OnOtherSideDisconect { get; set; }
 
-        public void Connect(IDPipeHandle pipeHandle, string connectMessage = null)
+        public void Connect(IDPipeHandle pipeHandle, string connectMessage = null, Encoding encoding = null)
         {
-            _dpipe.Connect(pipeHandle, connectMessage, _encoding);
+            if (string.IsNullOrEmpty(connectMessage))
+                _dpipe.Connect(pipeHandle);
+            else
+            {
+                var encodingCurrent = encoding == null ? Encoding : encoding;
+                var data = encodingCurrent.GetBytes(connectMessage);
+                var encodingCode = GetEncodingCode(encodingCurrent);
+                _dpipe.Connect(pipeHandle, data, encodingCode);
+            }
         }
-
-        public void Connect(string pipeHandleString, string connectMessage = null)
+        public void Connect(string pipeHandleString, string connectMessage = null, Encoding encoding = null)
         {
-            _dpipe.Connect(pipeHandleString, connectMessage, _encoding);
+            if (string.IsNullOrEmpty(connectMessage))
+                _dpipe.Connect(pipeHandleString);
+            else
+            {
+                var encodingCurrent = encoding == null ? Encoding : encoding;
+                var data = encodingCurrent.GetBytes(connectMessage);
+                var encodingCode = GetEncodingCode(encodingCurrent);
+                _dpipe.Connect(pipeHandleString, data, encodingCode);
+            }
         }
-
-        public void Disconnect(string disconnectMessage = null)
-        {
-            _dpipe.Disconnect(disconnectMessage, _encoding);
-        }
-
         private void OnClientConnectInner(PacketHeader header)
         {
-            var message = GetStringFromPipe(header.DataSize);
+            var message = GetString(header);
             OnClientConnect?.Invoke(message);
         }
         private void OnOtherSideDisconnectInner(PacketHeader header)
         {
-            var message = GetStringFromPipe(header.DataSize);
+            var message = GetString(header);
             OnOtherSideDisconect?.Invoke(message);
         }
         private void OnPacketHeaderReceivedInner(PacketHeader header)
         {
-            bool isStringData = (header.Command & 0x01) > 0;
+            //Get data code ignoring first 8 bits (using for encoding)
+            bool isStringData = (header.DataCodeOnly & 0x01) > 0;
 
             if (isStringData)
             {
-                var message = GetStringFromPipe(header.DataSize);
+                var message = GetString(header);
 
                 if (_handleAsync)
                     Task.Run(() => OnMessageStringReceivedInner(header, message));
                 else
                     OnMessageStringReceivedInner(header, message);
             }
-            else if (header.Command > 0)
+            else if (header.DataCodeOnly > 0)
             {
                 byte[] data = null;
 
@@ -83,7 +93,7 @@ namespace CreatorDK.IO.DPipes
             }
             else
             {
-                var message = GetStringFromPipe(header.DataSize);
+                var message = GetString(header);
                 OnMessageStringReceived?.Invoke(message);
             }
         }

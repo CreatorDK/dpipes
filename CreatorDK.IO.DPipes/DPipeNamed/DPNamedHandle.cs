@@ -4,24 +4,24 @@ using System.Xml.Linq;
 
 namespace CreatorDK.IO.DPipes
 {
-    public class DPipeNamedHandle : IDPipeHandle
+    public class DPNamedHandle : IDPipeHandle
     {
         public string ServerName { get; set; }
         public string PipeName { get; set; }
 
         public const string DefaultPipeName = "DPipeNamedDefault";
-        public DPipeNamedHandle(string serverName, string pipeName)
+        public DPNamedHandle(string serverName, string pipeName)
         {
             ServerName = serverName;
             PipeName = pipeName;
         }
-        public static DPipeNamedHandle Create(string pipeNameFull)
+        public static DPNamedHandle Create(string pipeNameFull)
         {
             if (IsNamed(pipeNameFull))
             {
                 var serverName = GetServerNamePart(pipeNameFull);
                 var pipeName = GetNamedPipeNamePart(pipeNameFull);
-                return new DPipeNamedHandle(serverName, pipeName);
+                return new DPNamedHandle(serverName, pipeName);
             }
             else
                 throw new ArgumentException("Invalid DPipeNamed pipe name");
@@ -30,9 +30,9 @@ namespace CreatorDK.IO.DPipes
         {
             return $"\\\\{ServerName}\\pipe\\{PipeName}";
         }
-        DPIPE_TYPE IDPipeHandle.GetType()
+        DP_TYPE IDPipeHandle.GetType()
         {
-            return DPIPE_TYPE.NAMED_PIPE;
+            return DP_TYPE.NAMED_PIPE;
         }
         public static bool IsNamed(string handleString)
         {

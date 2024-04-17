@@ -24,6 +24,8 @@ TestRegistrationServer ServerTest14();
 TestRegistrationServer ServerTest15();
 TestRegistrationServer ServerTest16();
 TestRegistrationServer ServerTest17();
+TestRegistrationServer ServerTestSpeedtest();
+TestRegistrationServer ServerTestFileTransfer();
 
 void RunAllServerTests(start_params_server& params) {
 	for (TestRegistrationServer& reg : _serverRegistrationsClass) {
@@ -64,12 +66,14 @@ void RunServerTest(start_params_server& params, bool bothPipes) {
 	_serverRegistrationsClass.push_back(ServerTest15());
 	_serverRegistrationsClass.push_back(ServerTest16());
 	_serverRegistrationsClass.push_back(ServerTest17());
+	_serverRegistrationsClass.push_back(ServerTestSpeedtest());
+	_serverRegistrationsClass.push_back(ServerTestFileTransfer());
 
 	if (params.test == L"all") {
 		if (bothPipes) {
-			params.pipeType = DPIPE_TYPE::ANONYMOUS_PIPE;
+			params.pipeType = DP_TYPE::ANONYMOUS_PIPE;
 			RunAllServerTests(params);
-			params.pipeType = DPIPE_TYPE::NAMED_PIPE;
+			params.pipeType = DP_TYPE::NAMED_PIPE;
 			RunAllServerTests(params);
 		}
 		else {
@@ -79,9 +83,9 @@ void RunServerTest(start_params_server& params, bool bothPipes) {
 		
 	else {
 		if (bothPipes) {
-			params.pipeType = DPIPE_TYPE::ANONYMOUS_PIPE;
+			params.pipeType = DP_TYPE::ANONYMOUS_PIPE;
 			RuServerTest(params, params.test);
-			params.pipeType = DPIPE_TYPE::NAMED_PIPE;
+			params.pipeType = DP_TYPE::NAMED_PIPE;
 			RuServerTest(params, params.test);
 		}
 		else {

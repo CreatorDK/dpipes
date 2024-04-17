@@ -1,4 +1,5 @@
 #pragma once
+#include <shared_mutex>
 #include <functional>
 
 namespace crdk {
@@ -42,6 +43,7 @@ namespace crdk {
 		private:
 			int _target = 0;
 			int _current = 0;
+			std::shared_mutex _mutex;
 			std::function<bool(int, int)> _comparator;
 		public:
 			IntTrigger(int targetNumber, std::function<bool(int, int)> comparator = EQUAL_COMPARATOR);

@@ -2,6 +2,8 @@
 #include "dpipea.h"
 #include <regex>
 #include <iostream>
+#include <io.h>
+#include <fcntl.h>
 
 using namespace std;
 using namespace crdk::dpipes;
@@ -27,7 +29,7 @@ using namespace crdk::dpipes;
 		ss >> _hWriteHandle;
 	}
 
-	DPipeAnonymousHandle* DPipeAnonymousHandle::Start(std::wstring handleString) {
+	DPipeAnonymousHandle* DPipeAnonymousHandle::Create(std::wstring handleString) {
 		if (!IsAnonymous(handleString))
 			throw exception("Invalid DPipeAnonymous handle string");
 
@@ -43,7 +45,7 @@ using namespace crdk::dpipes;
 		ss >> _hWriteHandle;
 	}
 
-	DPipeAnonymousHandle* DPipeAnonymousHandle::Start(std::wstring readHandleString, std::wstring writeHandleString) {
+	DPipeAnonymousHandle* DPipeAnonymousHandle::Create(std::wstring readHandleString, std::wstring writeHandleString) {
 		bool readHandleCorrect = IsHexHandle(readHandleString);
 
 		if (!readHandleCorrect)
@@ -60,20 +62,24 @@ using namespace crdk::dpipes;
 	const wstring DPipeAnonymousHandle::DefaultPipeName = L"Anonymous";
 
 	bool DPipeAnonymousHandle::IsAnonymous(const std::wstring handleString) {
-		wregex pattern(L"[0-9A-F]{16}:::[0-9A-F]{16}");
-		if (!regex_match(handleString, pattern))
-			return false;
+		wregex pattern1(L"[0-9A-F]{16}:::[0-9A-F]{16}");
+		wregex pattern2(L"[0-9A-F]{8}:::[0-9A-F]{8}");
 
-		return true;
+		if (regex_match(handleString, pattern1) || regex_match(handleString, pattern2))
+			return true;
+		else
+			return false;
 	}
 
 	bool DPipeAnonymousHandle::IsHexHandle(const std::wstring handleString)
 	{
-		wregex pattern(L"[0-9A-F]{16}");
-		if (!regex_match(handleString, pattern))
-			return false;
+		wregex pattern1(L"[0-9A-F]{16}");
+		wregex pattern2(L"[0-9A-F]{8}");
 
-		return true;
+		if (regex_match(handleString, pattern1) || regex_match(handleString, pattern2))
+			return true;
+		else
+			return false;
 	}
 
 	DPipeAnonymousHandle::~DPipeAnonymousHandle() { }
@@ -101,7 +107,7 @@ using namespace crdk::dpipes;
 		return result;
 	}
 
-	DPIPE_TYPE DPipeAnonymousHandle::GetType() const {
+	DP_TYPE DPipeAnonymousHandle::GetType() const {
 		return ANONYMOUS_PIPE;
 	}
 #pragma endregion DPipeAnonymousHandle
@@ -111,33 +117,39 @@ using namespace crdk::dpipes;
 
 	DPipeAnonymous::DPipeAnonymous(DWORD nInBufferSize,
 		DWORD nOutBufferSize) :
-		IDPipe(DPipeAnonymousHandle::DefaultPipeName, nInBufferSize, nOutBufferSize) { 
-		_type = DPIPE_TYPE::ANONYMOUS_PIPE;
+		//IDPipe(DPipeAnonymousHandle::DefaultPipeName, DWORD_MAX_VALUE, nInBufferSize, nOutBufferSize) {
+		IDPipe(DPipeAnonymousHandle::DefaultPipeName, DWORD_MAX_VALUE, nInBufferSize, nOutBufferSize) {
+		_type = DP_TYPE::ANONYMOUS_PIPE;
 	}
 
 	DPipeAnonymous::DPipeAnonymous(const wstring& sName,
 		DWORD nInBufferSize,
 		DWORD nOutBufferSize) :
-		IDPipe(sName, nInBufferSize, nOutBufferSize) { 
-		_type = DPIPE_TYPE::ANONYMOUS_PIPE;
+		//IDPipe(sName, DWORD_MAX_VALUE, nInBufferSize, nOutBufferSize) {
+		IDPipe(sName, DWORD_MAX_VALUE, nInBufferSize, nOutBufferSize) {
+		_type = DP_TYPE::ANONYMOUS_PIPE;
+	}
+
+	DPipeAnonymous::~DPipeAnonymous() {
+		//Disconnect();
 	}
 
 	bool DPipeAnonymous::IsAlive() const {
 		return _bIsAlive;
 	}
 
-	DPIPE_MODE DPipeAnonymous::Mode() const {
+	DP_MODE DPipeAnonymous::Mode() const {
 		return _mode;
 	}
 
-	DPIPE_TYPE DPipeAnonymous::Type() const {
+	DP_TYPE DPipeAnonymous::Type() const {
 		return _type;
 	}
 
 	bool DPipeAnonymous::Start() {
-		if (_mode == DPIPE_MODE::INNITIATOR)
+		if (_mode == DP_MODE::INNITIATOR)
 			throw exception("Pipe already created");
-		else if (_mode == DPIPE_MODE::CLIENT)
+		else if (_mode == DP_MODE::CLIENT)
 			throw exception("Cannot create pipe in client mode");
 
 		bool bReturn = false;
@@ -159,7 +171,7 @@ using namespace crdk::dpipes;
 		}
 
 		_bListening = true;
-		_mode = DPIPE_MODE::INNITIATOR;
+		_mode = DP_MODE::INNITIATOR;
 
 		_tReadThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ReadLoop, (LPVOID)this, 0, &_nReadThreadId);
 
@@ -168,10 +180,10 @@ using namespace crdk::dpipes;
 
 	shared_ptr<IDPipeHandle> DPipeAnonymous::GetHandle() {
 
-		if (_mode == DPIPE_MODE::UNSTARTED)
+		if (_mode == DP_MODE::UNSTARTED)
 			throw exception("Unable to get handle of unstarded dpipe");
 
-		if (_mode == DPIPE_MODE::CLIENT)
+		if (_mode == DP_MODE::CLIENT)
 			throw exception("Unable to get handle in client mode");
 
 		if (_bIsAlive)
@@ -185,43 +197,75 @@ using namespace crdk::dpipes;
 	}
 
 	bool DPipeAnonymous::Connect(IDPipeHandle *pHandle) {
-		if (_mode == DPIPE_MODE::CLIENT || _mode == DPIPE_MODE::INNITIATOR)
+		if (_mode == DP_MODE::CLIENT || _mode == DP_MODE::INNITIATOR)
 			return true;
 
 		if (pHandle == nullptr)
 			throw new invalid_argument("Handle is invalid");
 		
-		auto pDPipeAnonymousHandler = DPipeAnonymousHandle::Start(pHandle->AsString());
-		bool bResult = Connect(pDPipeAnonymousHandler);
+		auto pDPipeAnonymousHandler = DPipeAnonymousHandle::Create(pHandle->AsString());
+		bool bResult = ConnectAnonymus(pDPipeAnonymousHandler);
 		delete pDPipeAnonymousHandler;
 		return bResult;
 	}
 
-	bool DPipeAnonymous::Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize)
+	bool DPipeAnonymous::Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix)
 	{
-		auto pDPipeAnonymousHandler = DPipeAnonymousHandle::Start(pHandle->AsString());
-		bool bResult = Connect(pDPipeAnonymousHandler, pConnectData, nConnectDataSize);
+		auto pDPipeAnonymousHandler = DPipeAnonymousHandle::Create(pHandle->AsString());
+		bool bResult = ConnectAnonymus(pDPipeAnonymousHandler, pConnectData, nConnectDataSize, prefix);
 		delete pDPipeAnonymousHandler;
 		return bResult;
 	}
 
-	bool DPipeAnonymous::Connect(DPipeAnonymousHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize)
+	bool DPipeAnonymous::ConnectAnonymus(DPipeAnonymousHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix)
 	{
-		if (_mode == DPIPE_MODE::CLIENT || _mode == DPIPE_MODE::INNITIATOR)
+		if (_mode == DP_MODE::CLIENT || _mode == DP_MODE::INNITIATOR)
 			return true;
 
 		if (pHandle == nullptr)
 			throw new invalid_argument("pHandle is invalid");
 
+		HANDLE readPipe = pHandle->GetReadHandle();
+
+		if (readPipe == INVALID_HANDLE_VALUE)
+			throw new invalid_argument("Read Handle is invalid");
+
+		HANDLE writePipe = pHandle->GetWriteHandle();
+
+		if (writePipe == INVALID_HANDLE_VALUE)
+			throw new invalid_argument("Write Handle is invalid");
+
+		if (!SendPing(writePipe))
+			throw new invalid_argument("Unable to write to the pipe");
+
+		bool listening = true;
+		bool success = false;
+		auto headerPong = _packetPuilder.GetPacketHeader(readPipe, listening, success, _nLastError);
+
+		if (!success || headerPong.GetServiceCode() != DP_SERVICE_CODE_PONG)
+			throw new invalid_argument("Unable to read from the pipe");
+
 		_hReadPipe = pHandle->GetReadHandle();
 		_hWritePipe = pHandle->GetWriteHandle();
 
-		_mode = DPIPE_MODE::CLIENT;
+		SendMtuRequest(_hWritePipe, _mtu);
+
+		auto headerMtu = _packetPuilder.GetPacketHeader(_hReadPipe, listening, success, _nLastError);
+		if (!success || headerMtu.GetServiceCode() != DP_SERVICE_CODE_MTU_RESPONSE)
+			throw new invalid_argument("Unable to get mtu size");
+
+		_nBytesToRead = 4;
+		OnMtuResponse(headerMtu);
+
+		_mode = DP_MODE::CLIENT;
 		_bListening = true;
 		_bIsAlive = true;
 		_tReadThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ReadLoop, (LPVOID)this, 0, &_nReadThreadId);
 
-		_packetPuilder.PrepareServiceHeader(SERVICE_CODE_CONNECT, nConnectDataSize);
+		PacketHeader header(true, nConnectDataSize);
+		header.SetServiceCode(DP_SERVICE_CODE_CONNECT);
+		header.SetServicePrefix(prefix);
+		_packetPuilder.PrepareHeader(header);
 		bool bReturn = _packetPuilder.WriteHeader(_hWritePipe);
 		DWORD nBytesWritten;
 
@@ -235,13 +279,13 @@ using namespace crdk::dpipes;
 		return bReturn;
 	}
 
-	bool DPipeAnonymous::Connect(DPipeAnonymousHandle* handle) {
+	bool DPipeAnonymous::ConnectAnonymus(DPipeAnonymousHandle* handle) {
 		return Connect(handle, nullptr, 0);
 	}
 
-	bool DPipeAnonymous::Connect(std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize) {
-		auto handle = DPipeAnonymousHandle::Start(handleString);
-		bool bResult = Connect(handle, pConnectData, nConnectDataSize);
+	bool DPipeAnonymous::Connect(std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix) {
+		auto handle = DPipeAnonymousHandle::Create(handleString);
+		bool bResult = ConnectAnonymus(handle, pConnectData, nConnectDataSize, prefix);
 		delete handle;
 		return bResult;
 	}
@@ -250,30 +294,35 @@ using namespace crdk::dpipes;
 		return Connect(handleString, nullptr, 0);
 	}
 
-	void DPipeAnonymous::DisconnectPipe() {
+	void DPipeAnonymous::DisconnectPipe(bool isAlive) {
 
-		if (_mode == DPIPE_MODE::INNITIATOR) {
+		if (_mode == DP_MODE::INNITIATOR) {
 
-			if (_hWritePipe != nullptr) {
+			//CloseHandle(_hReadPipeClient);
+			//_hReadPipeClient = nullptr;
+
+			//CloseHandle(_hWritePipeClient);
+			//_hWritePipeClient = nullptr;
+
+			if (_hWritePipe != nullptr || _hWritePipe != NULL) {
 				CloseHandle(_hWritePipe);
 				_hWritePipe = nullptr;
 			}
 
-			if (_hReadPipe != nullptr) {
+			if (_hReadPipe != nullptr || _hReadPipe != NULL) {
 				CloseHandle(_hReadPipe);
 				_hReadPipe = nullptr;
 			}
 		}
 
-		else if (_mode == DPIPE_MODE::CLIENT) {
+		else if (_mode == DP_MODE::CLIENT) {
 
-			if (_hWritePipe != nullptr) {
+			if (_hWritePipe != nullptr || _hWritePipe != NULL) {
 				CloseHandle(_hWritePipe);
 				_hWritePipe = nullptr;
 			}
 
-			if (_hReadPipe != nullptr) {
-				//Here thread blocikng (client cannot close handle) until Inniciator close his write end of pipe
+			if (_hReadPipe != nullptr || _hReadPipe != NULL) {
 				CloseHandle(_hReadPipe);
 				_hReadPipe = nullptr;
 			}
@@ -281,16 +330,58 @@ using namespace crdk::dpipes;
 	}
 
 	bool DPipeAnonymous::Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped) {
-		bool bReturn = FALSE;
-		bReturn = ReadFile(_hReadPipe, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped);
-		_nBytesRead += (*lpNumberOfBytesRead);
-		_nBytesToRead -= (*lpNumberOfBytesRead);
 
-		return bReturn;
+		char* bufferPtr = (char*)lpBuffer;
+		DWORD bytesReadTotal = 0;
+
+		while (nNumberOfBytesToRead != bytesReadTotal) {
+			DWORD nBytesToRead;
+			if ((nNumberOfBytesToRead - bytesReadTotal) > _mtu)
+				nBytesToRead = _mtu;
+			else
+				nBytesToRead = nNumberOfBytesToRead - bytesReadTotal;
+
+			DWORD nBytesRead = 0;
+
+			if (ReadFile(_hReadPipe, bufferPtr, nBytesToRead, &nBytesRead, lpOverlapped)) {
+				bufferPtr = bufferPtr + nBytesRead;
+				bytesReadTotal += nBytesRead;
+				_nBytesRead += nBytesRead;
+				_nBytesToRead -= nBytesRead;
+			}
+			else {
+				*lpNumberOfBytesRead = bytesReadTotal;
+				return false;
+			}
+		}
+		
+		*lpNumberOfBytesRead = bytesReadTotal;
+		return true;
+	}
+
+	bool DPipeAnonymous::Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead) {
+		return Read(lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, NULL);
+	}
+
+	bool DPipeAnonymous::Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
+		DWORD nBytesRead;
+		return Read(lpBuffer, nNumberOfBytesToRead, &nBytesRead, NULL);
+	}
+
+	shared_ptr<HeapAllocatedData> DPipeAnonymous::Read(PacketHeader header) {
+		auto heapData = make_shared<HeapAllocatedData>(header.DataSize(), false);
+		DWORD nBytesRead;
+		Read(heapData->data(), heapData->size(), &nBytesRead, nullptr);
+		return heapData;
 	}
 
 	bool DPipeAnonymous::Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
-		return Write(SERVICE_CODE_RAW_CLIENT, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
+		return Write(DP_SERVICE_CODE_RAW_CLIENT, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
+	}
+
+	bool DPipeAnonymous::Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) {
+		DWORD nBytesWritten;
+		return Write(DP_SERVICE_CODE_RAW_CLIENT, lpBuffer, nNumberOfBytesToWrite, &nBytesWritten);
 	}
 
 	bool DPipeAnonymous::Write(unsigned int serviceCode, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
@@ -301,13 +392,50 @@ using namespace crdk::dpipes;
 		return bReturn;
 	}
 
+	bool crdk::dpipes::DPipeAnonymous::Write(unsigned int serviceCode, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) {
+		DWORD nBytesWritten;
+		return Write(serviceCode, lpBuffer, nNumberOfBytesToWrite, &nBytesWritten);
+	}
+
 	bool DPipeAnonymous::WritePacketHeader(PacketHeader header) {
-		_packetPuilder.PrepareClientHeader(header.GetServiceCode(), header.DataSize());
+		_packetPuilder.PrepareClientHeader(header.GetCode(), header.DataSize());
 		return _packetPuilder.WriteHeader(_hWritePipe);
 	}
 
+	bool DPipeAnonymous::WriteRaw(HANDLE hWriteHandle, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
+
+		char* bufferPtr = (char*)lpBuffer;
+		DWORD bytesWrittenTotal = 0;
+
+		while (bytesWrittenTotal != nNumberOfBytesToWrite) {
+			DWORD nBytesToWrite;
+			if ((nNumberOfBytesToWrite - bytesWrittenTotal) > _mtu)
+				nBytesToWrite = _mtu;
+			else
+				nBytesToWrite = nNumberOfBytesToWrite - bytesWrittenTotal;
+
+			DWORD nBytesWritten;
+			if (WriteFile(hWriteHandle, bufferPtr, nBytesToWrite, &nBytesWritten, NULL)) {
+				bytesWrittenTotal += nBytesWritten;
+				bufferPtr = bufferPtr + nBytesWritten;
+			}
+			else {
+				*lpNumberOfByteWritten = bytesWrittenTotal;
+				return false;
+			}
+		}
+
+		*lpNumberOfByteWritten = bytesWrittenTotal;
+		return true;
+	}
+
 	bool DPipeAnonymous::WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
-		return WriteFile(_hWritePipe, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten, NULL);
+		return WriteRaw(_hWritePipe, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
+	}
+
+	bool DPipeAnonymous::WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) {
+		DWORD nBytesWritten;
+		return WriteRaw(_hWritePipe, lpBuffer, nNumberOfBytesToWrite, &nBytesWritten);
 	}
 
 	void DPipeAnonymous::ReadLoop(LPVOID data) {
@@ -321,18 +449,25 @@ using namespace crdk::dpipes;
 				continue;
 			}
 
-			PacketHeader header = pInstance->_packetPuilder.GetPacketHeader(pInstance->_hReadPipe, pInstance->_bListening, pInstance->_nLastError);
+			bool sucess;
+			PacketHeader header = pInstance->_packetPuilder.GetPacketHeader(pInstance->_hReadPipe, pInstance->_bListening, sucess, pInstance->_nLastError);
+			pInstance->_nBytesRead = 0;
 			pInstance->_nBytesToRead = header.DataSize();
-			auto command = PacketBuilder::GetCommand(header.GetServiceCode());
 
 			if (header.IsService()) {
+
+				auto command = header.GetServiceCode();
 				pInstance->ServicePacketReceived(header);
-				if (command == SERVICE_CODE_DISCONNECTED) {
+
+				if (command == DP_SERVICE_CODE_DISCONNECTED) {
 					disconnection = true;
 					break;
 				}
-				else if (command == SERVICE_CODE_DISCONNECT) {
-					pInstance->_packetPuilder.PrepareServiceHeader(SERVICE_CODE_DISCONNECTED);
+				else if (command == DP_SERVICE_CODE_DISCONNECT) {
+					if (pInstance->_clientEmulating)
+						Sleep(100);
+
+					pInstance->_packetPuilder.PrepareServiceHeader(DP_SERVICE_CODE_DISCONNECTED);
 					pInstance->_packetPuilder.WriteHeader(pInstance->_hWritePipe);
 					disconnection = true;
 					break;
@@ -348,14 +483,16 @@ using namespace crdk::dpipes;
 	}
 
 	void crdk::dpipes::DPipeAnonymous::OnPipeClientConnect() {
-		CloseHandle(_hReadPipeClient);
-		_hReadPipeClient = nullptr;
-		CloseHandle(_hWritePipeClient);
-		_hWritePipeClient = nullptr;
+
+		//CloseHandle(_hReadPipeClient);
+		//_hReadPipeClient = nullptr;
+
+		//CloseHandle(_hWritePipeClient);
+		//_hWritePipeClient = nullptr;
 	}
 
-	DPipeAnonymous::~DPipeAnonymous() {
-		Disconnect();
+	IDPipe*  DPipeAnonymous::CreateNewInstance() {
+		return new DPipeAnonymous(_nInBufferSize, _nOutBufferSize);
 	}
 
 #pragma endregion DPipeAnonymous

@@ -119,7 +119,7 @@ namespace DPipeTestCS.ClientTests
                     if (NewConsole)
                         WriteLine($"Request send async in thread {Thread.CurrentThread.ManagedThreadId}");
 
-                    _dpclient.Send(7, 8, message);
+                    _dpclient.SendRequest(7, 8, message);
                 });
 
                 send10AsyncRequestTrigger.Increase(1);
@@ -174,15 +174,15 @@ namespace DPipeTestCS.ClientTests
             Trigger.Wait(messagesReceivedTrigger);
 
             var message1 = _dpclient.Encoding.GetBytes("Hello handler 1!");
-            var resp1 = _dpclient.Send(1, 2, message1);
+            var resp1 = _dpclient.SendRequest(1, 2, message1);
             WriteLine($"14. Received response 1 in {resp1.TotalDuraction.ToString(@"ss\.fff")}s");
 
             var message2 = _dpclient.Encoding.GetBytes("Hello handler 2!");
-            var resp2 = _dpclient.Send(2, 3, message2);
+            var resp2 = _dpclient.SendRequest(2, 3, message2);
             WriteLine($"15. Received response 2 in {resp2.TotalDuraction.ToString(@"ss\.fff")}s");
 
             var message3 = _dpclient.Encoding.GetBytes("Hello handler 3!");
-            var resp3 = _dpclient.Send(3, 4, message3);
+            var resp3 = _dpclient.SendRequest(3, 4, message3);
             WriteLine($"16. Received response 3 in {resp3.TotalDuraction.ToString(@"ss\.fff")}s");
 
             var message4 = _dpclient.Encoding.GetBytes("Hello handler 4!");
@@ -206,7 +206,7 @@ namespace DPipeTestCS.ClientTests
 
             WriteLine("20. Sending last request");
             var messageLast = _dpclient.Encoding.GetBytes("Hello last handler!");
-            _dpclient.Send(9, 10, messageLast);
+            _dpclient.SendRequest(9, 10, messageLast);
 
             WriteLine("21. Disconnecting");
             _dpclient.Disconnect("Goodbuy, motherfucker!");

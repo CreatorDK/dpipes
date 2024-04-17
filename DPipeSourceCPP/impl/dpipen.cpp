@@ -5,7 +5,9 @@
 using namespace std;
 using namespace crdk::dpipes;
 
-//Hanlde of named duplex pipe implementation
+#define BufferSize 65536
+
+//Hanlde of named duplex server implementation
 #pragma region DPipeNamedHandle
 
 	DPipeNamedHandle::DPipeNamedHandle(const wstring& sServerName, const wstring& sPipeName) {
@@ -70,7 +72,7 @@ using namespace crdk::dpipes;
 
 		int pipeWordIndex = 0;
 
-		for (int i = 2; i < handleString.length(); i++) {
+		for (unsigned int i = 2; i < handleString.length(); i++) {
 			if (handleString[i] == '\\') {
 				pipeWordIndex = i + 1;
 				break;
@@ -89,7 +91,7 @@ using namespace crdk::dpipes;
 		return L"\\\\" + _sServerName + L"\\pipe\\" + _sPipeName;
 	}
 
-	DPIPE_TYPE DPipeNamedHandle::GetType() const {
+	DP_TYPE DPipeNamedHandle::GetType() const {
 		return NAMED_PIPE;
 	}
 
@@ -104,34 +106,38 @@ using namespace crdk::dpipes;
 
 	DPipeNamed::DPipeNamed(DWORD nInBufferSize,
 		DWORD nOutBufferSize) :
-		IDPipe(DPipeNamedHandle::DefaultPipeName, nInBufferSize, nOutBufferSize) {
-		_type = DPIPE_TYPE::NAMED_PIPE;
+		IDPipe(DPipeNamedHandle::DefaultPipeName, DWORD_MAX_VALUE, nInBufferSize, nOutBufferSize) {
+		_type = DP_TYPE::NAMED_PIPE;
 	}
 
 	DPipeNamed::DPipeNamed(const wstring& name,
 		DWORD nInBufferSize,
 		DWORD nOutBufferSize) :
-		IDPipe(name, nInBufferSize, nOutBufferSize) { 
-		_type = DPIPE_TYPE::NAMED_PIPE;
+		IDPipe(name, DWORD_MAX_VALUE, nInBufferSize, nOutBufferSize) {
+		_type = DP_TYPE::NAMED_PIPE;
+	}
+
+	DPipeNamed::~DPipeNamed() {
+		//Disconnect();
 	}
 
 	bool DPipeNamed::IsAlive() const {
 		return _isAlive;
 	}
 
-	DPIPE_MODE DPipeNamed::Mode() const {
+	DP_MODE DPipeNamed::Mode() const {
 		return _mode;
 	}
 
-	DPIPE_TYPE DPipeNamed::Type() const
+	DP_TYPE DPipeNamed::Type() const
 	{
 		return _type;
 	}
 
 	bool DPipeNamed::Start(LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
-		if (_mode == DPIPE_MODE::INNITIATOR)
+		if (_mode == DP_MODE::INNITIATOR)
 			throw exception("Pipe already created");
-		else if (_mode == DPIPE_MODE::CLIENT)
+		else if (_mode == DP_MODE::CLIENT)
 			throw exception("Cannot create pipe in client mode");
 
 		wstring pipeNameRead = L"\\\\.\\pipe\\" + _sName + L"_read";
@@ -166,7 +172,7 @@ using namespace crdk::dpipes;
 			throw exception("Unable to create write named pipe");
 
 		_bListening = true;
-		_mode = DPIPE_MODE::INNITIATOR;
+		_mode = DP_MODE::INNITIATOR;
 		_tReadThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ReadLoop, (LPVOID)this, 0, &_nReadThreadId);
 
 		return true;
@@ -190,16 +196,14 @@ using namespace crdk::dpipes;
 		}
 	}
 
-
-
-	bool DPipeNamed::Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
-		if (_mode == DPIPE_MODE::CLIENT || _mode == DPIPE_MODE::INNITIATOR)
+	bool DPipeNamed::ConnectNamed(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize, LPSECURITY_ATTRIBUTES lpSecurityAttributes, DWORD prefix) {
+		if (_mode == DP_MODE::CLIENT || _mode == DP_MODE::INNITIATOR)
 			return true;
 
 		if (pHandle == nullptr)
 			throw new invalid_argument("pHandle is invalid");
 
-		_mode = DPIPE_MODE::CLIENT;
+		_mode = DP_MODE::CLIENT;
 
 		wstring pipeNameFull = pHandle->AsString();
 		_sName = DPipeNamedHandle::GetNamedPipeNamePart(pipeNameFull);
@@ -208,11 +212,11 @@ using namespace crdk::dpipes;
 		wstring pipeNameWrite = pipeNameFull + L"_write";
 
 		_hReadPipe = CreateFile(
-			&pipeNameWrite[0],		// pipe name 
+			&pipeNameWrite[0],		// server name 
 			GENERIC_READ,			// read  access 
 			0,						// no sharing 
 			lpSecurityAttributes,					// default security attributes
-			OPEN_EXISTING,			// opens existing pipe 
+			OPEN_EXISTING,			// opens existing server 
 			0,						// default attributes 
 			NULL);					// no template file 
 
@@ -223,11 +227,11 @@ using namespace crdk::dpipes;
 			throw new invalid_argument("Read pipe is busy");
 
 		_hWritePipe = CreateFile(
-			&pipeNameRead[0],		// pipe name 
+			&pipeNameRead[0],		// server name 
 			GENERIC_WRITE,			// write access 
 			0,						// no sharing 
 			lpSecurityAttributes,					// default security attributes
-			OPEN_EXISTING,			// opens existing pipe 
+			OPEN_EXISTING,			// opens existing server 
 			0,						// default attributes 
 			NULL);					// no template file 
 
@@ -239,13 +243,28 @@ using namespace crdk::dpipes;
 		if (_nLastError == ERROR_PIPE_BUSY)
 			throw new invalid_argument("Write pipe is busy");
 
+		SendMtuRequest(_hWritePipe, _mtu);
+
+		bool listening = true;
+		bool success = false;
+		auto headerMtu = _packetPuilder.GetPacketHeader(_hReadPipe, listening, success, _nLastError);
+		if (!success || headerMtu.GetServiceCode() != DP_SERVICE_CODE_MTU_RESPONSE)
+			throw new invalid_argument("Unable to get mtu size");
+
+		_nBytesToRead = 4;
+		OnMtuResponse(headerMtu);
+
 		_bListening = true;
 		_bIsAlive = true;
 		_tReadThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ReadLoop, (LPVOID)this, 0, &_nReadThreadId);
 
 		DWORD numberOfByteWritten;
-		_packetPuilder.PrepareServiceHeader(SERVICE_CODE_CONNECT, nConnectDataSize);
-		bool bReturn = WriteInner(_packetPuilder.GetBufferHeaderOut(), _packetPuilder.BufferHeaderSize(), &numberOfByteWritten);
+
+		PacketHeader header(true, nConnectDataSize);
+		header.SetServiceCode(DP_SERVICE_CODE_CONNECT);
+		header.SetServicePrefix(prefix);
+		_packetPuilder.PrepareHeader(header);
+		bool bReturn = WriteInner(_hWritePipe ,_packetPuilder.GetBufferHeaderOut(), _packetPuilder.BufferHeaderSize(), &numberOfByteWritten);
 
 		if (nConnectDataSize) {
 			DWORD nBytesWritten;
@@ -258,66 +277,67 @@ using namespace crdk::dpipes;
 		return bReturn;
 	}
 
-	bool DPipeNamed::Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize) {
-		return Connect(pHandle, pConnectData, nConnectDataSize, nullptr);
+	bool DPipeNamed::Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix) {
+		return ConnectNamed(pHandle, pConnectData, nConnectDataSize, nullptr, prefix);
 	}
 
-	bool DPipeNamed::Connect(IDPipeHandle* handle, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
-		return Connect(handle, nullptr, 0, lpSecurityAttributes);
+	bool DPipeNamed::ConnectNamed(IDPipeHandle* handle, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
+		return ConnectNamed(handle, nullptr, 0, lpSecurityAttributes);
 	}
 
 	bool DPipeNamed::Connect(IDPipeHandle* handle) {
-		return Connect(handle, nullptr, 0, nullptr);
+		return ConnectNamed(handle, nullptr, 0, nullptr);
 	}
 
-	bool crdk::dpipes::DPipeNamed::Connect(std::wstring handleString, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
-		return Connect(handleString, nullptr, 0, lpSecurityAttributes);
+	bool DPipeNamed::ConnectNamed(std::wstring handleString, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
+		return ConnectNamed(handleString, nullptr, 0, lpSecurityAttributes);
 	}
 
 	bool DPipeNamed::Connect(wstring handleString) {
-		return Connect(handleString, nullptr, 0, nullptr);
+		return ConnectNamed(handleString, nullptr, 0, nullptr);
 	}
 
-	bool DPipeNamed::Connect(std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
+	bool DPipeNamed::ConnectNamed(std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize, LPSECURITY_ATTRIBUTES lpSecurityAttributes) {
 		auto handle = DPipeNamedHandle::Create(handleString);
-		bool bResult = Connect(handle, pConnectData, nConnectDataSize, lpSecurityAttributes);
+		bool bResult = ConnectNamed(handle, pConnectData, nConnectDataSize, lpSecurityAttributes);
 		delete handle;
 		return bResult;
 	}
 
-	bool DPipeNamed::Connect(std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize) {
+	bool DPipeNamed::Connect(std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix) {
 		auto handle = DPipeNamedHandle::Create(handleString);
-		bool bResult = Connect(handle, pConnectData, nConnectDataSize);
+		bool bResult = Connect(handle, pConnectData, nConnectDataSize, prefix);
 		delete handle;
 		return bResult;
 	}
 
-	void DPipeNamed::DisconnectPipe() {
+	void DPipeNamed::DisconnectPipe(bool isAlive) {
 
-		if (_mode == DPIPE_MODE::INNITIATOR)
+		if (_mode == DP_MODE::INNITIATOR)
 		{
 			DisconnectNamedPipe(_hReadPipe);
-			DisconnectNamedPipe(_hWritePipe);
 
-			if (_hReadPipe != nullptr) {
+			if (_hReadPipe != nullptr || _hReadPipe != NULL) {
 				CloseHandle(_hReadPipe);
 				_hReadPipe = nullptr;
 			}
 
-			if (_hWritePipe != nullptr) {
+			DisconnectNamedPipe(_hWritePipe);
+
+			if (_hWritePipe != nullptr || _hWritePipe != NULL) {
 				CloseHandle(_hWritePipe);
 				_hWritePipe = nullptr;
 			}
 		}
 
-		else if (_mode == DPIPE_MODE::CLIENT) {
+		else if (_mode == DP_MODE::CLIENT) {
 
-			if (_hReadPipe != nullptr) {
+			if (_hReadPipe != nullptr || _hReadPipe != NULL) {
 				CloseHandle(_hReadPipe);
 				_hReadPipe = nullptr;
 			}
 
-			if (_hWritePipe != nullptr) {
+			if (_hWritePipe != nullptr || _hWritePipe != NULL) {
 				CloseHandle(_hWritePipe);
 				_hWritePipe = nullptr;
 			}
@@ -326,20 +346,18 @@ using namespace crdk::dpipes;
 
 	void crdk::dpipes::DPipeNamed::OnPipeClientConnect() { }
 
-	bool DPipeNamed::Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped) {
-		bool bReturn = FALSE;
-		bReturn = ReadFile(_hReadPipe, lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, lpOverlapped);
-		_nBytesRead += (*lpNumberOfBytesRead);
-		_nBytesToRead -= (*lpNumberOfBytesRead);
-
-		return bReturn;
+	std::shared_ptr<HeapAllocatedData> DPipeNamed::Read(PacketHeader header) {
+		auto heapData = make_shared<HeapAllocatedData>(header.DataSize(), false);
+		DWORD nBytesRead;
+		Read(heapData->data(), heapData->size(), &nBytesRead, nullptr);
+		return heapData;
 	}
 
 	void DPipeNamed::ReadLoop(LPVOID lpVoid) {
 		auto pInstance = (DPipeNamed*)lpVoid;
 		bool disconnection = false;
 
-		if (pInstance->_mode == DPIPE_MODE::INNITIATOR) {
+		if (pInstance->_mode == DP_MODE::INNITIATOR) {
 
 			bool bConnected = ConnectNamedPipe(pInstance->_hReadPipe, NULL);
 		
@@ -356,18 +374,24 @@ using namespace crdk::dpipes;
 				continue;
 			}
 
-			PacketHeader header = pInstance->_packetPuilder.GetPacketHeader(pInstance->_hReadPipe, pInstance->_bListening, pInstance->_nLastError);
+			bool success;
+			PacketHeader header = pInstance->_packetPuilder.GetPacketHeader(pInstance->_hReadPipe, pInstance->_bListening, success, pInstance->_nLastError);
+			pInstance->_nBytesRead = 0;
 			pInstance->_nBytesToRead = header.DataSize();
-			auto command = PacketBuilder::GetCommand(header.GetServiceCode());
 
 			if (header.IsService()) {
+
+				auto command = PacketBuilder::GetCommand(header.GetServiceCode());
 				pInstance->ServicePacketReceived(header);
-				if (command == SERVICE_CODE_DISCONNECTED) {
+
+				if (command == DP_SERVICE_CODE_DISCONNECTED) {
 					disconnection = true;
 					break;
 				}
-				else if (command == SERVICE_CODE_DISCONNECT) {
-					pInstance->_packetPuilder.PrepareServiceHeader(SERVICE_CODE_DISCONNECTED);
+				else if (command == DP_SERVICE_CODE_DISCONNECT) {
+					if (pInstance->_clientEmulating)
+						Sleep(100);
+					pInstance->_packetPuilder.PrepareServiceHeader(DP_SERVICE_CODE_DISCONNECTED);
 					pInstance->_packetPuilder.WriteHeader(pInstance->_hWritePipe);
 					disconnection = true;
 					break;
@@ -383,10 +407,50 @@ using namespace crdk::dpipes;
 			pInstance->OnOtherSideDisconnectPipe();
 	}
 
-	bool DPipeNamed::WriteInner(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
-		if (!_bPipeWriteConnected && _mode == DPIPE_MODE::INNITIATOR) {
+	bool DPipeNamed::Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped) {
+
+		char* bufferPtr = (char*)lpBuffer;
+		DWORD bytesReadTotal = 0;
+
+		while (nNumberOfBytesToRead != bytesReadTotal) {
+			DWORD nBytesToRead;
+			if ((nNumberOfBytesToRead - bytesReadTotal) > _mtu)
+				nBytesToRead = _mtu;
+			else
+				nBytesToRead = nNumberOfBytesToRead - bytesReadTotal;
+
+			DWORD nBytesRead = 0;
+
+			if (ReadFile(_hReadPipe, bufferPtr, nBytesToRead, &nBytesRead, lpOverlapped)) {
+				bufferPtr = bufferPtr + nBytesRead;
+				bytesReadTotal += nBytesRead;
+				_nBytesRead += nBytesRead;
+				_nBytesToRead -= nBytesRead;
+			}
+			else {
+				*lpNumberOfBytesRead = bytesReadTotal;
+				return false;
+			}
+		}
+
+		*lpNumberOfBytesRead = bytesReadTotal;
+		return true;
+	}
+
+	bool DPipeNamed::Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead) {
+		return Read(lpBuffer, nNumberOfBytesToRead, lpNumberOfBytesRead, NULL);
+	}
+
+	bool DPipeNamed::Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) {
+		DWORD nBytesRead;
+		return Read(lpBuffer, nNumberOfBytesToRead, &nBytesRead, NULL);
+	}
+
+	bool DPipeNamed::WriteInner(HANDLE hWriteHandle, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
+
+		if (!_bPipeWriteConnected && _mode == DP_MODE::INNITIATOR) {
 			DWORD connectionError = 0;
-			bool bConnected = ConnectNamedPipe(_hWritePipe, NULL);
+			bool bConnected = ConnectNamedPipe(hWriteHandle, NULL);
 
 			if (!bConnected)
 				connectionError = GetLastError();
@@ -402,10 +466,32 @@ using namespace crdk::dpipes;
 				_bPipeWriteConnected = true;
 		}
 
-		return WriteFile(_hWritePipe, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten, NULL);
+		char* bufferPtr = (char*)lpBuffer;
+		DWORD bytesWritenTotal = 0;
+
+		while (bytesWritenTotal != nNumberOfBytesToWrite) {
+			DWORD nBytesToWrite;
+			if ((nNumberOfBytesToWrite - bytesWritenTotal) > _mtu)
+				nBytesToWrite = _mtu;
+			else
+				nBytesToWrite = nNumberOfBytesToWrite - bytesWritenTotal;
+
+			DWORD nBytesWritten;
+			if (WriteFile(hWriteHandle, bufferPtr, nBytesToWrite, &nBytesWritten, NULL)) {
+				bytesWritenTotal += nBytesWritten;
+				bufferPtr = bufferPtr + nBytesWritten;
+			}
+			else {
+				*lpNumberOfByteWritten = bytesWritenTotal;
+				return false;
+			}
+		}
+
+		*lpNumberOfByteWritten = bytesWritenTotal;
+		return true;
 	}
 
-	DPipeNamed* crdk::dpipes::DPipeNamed::Create(const std::wstring& name, DWORD nInBufferSize, DWORD nOutBufferSize) {
+	DPipeNamed* DPipeNamed::Create(const std::wstring& name, DWORD nInBufferSize, DWORD nOutBufferSize) {
 		if (DPipeNamedHandle::IsNamed(name))
 			return new DPipeNamed(name, nInBufferSize, nOutBufferSize);
 		else
@@ -413,27 +499,46 @@ using namespace crdk::dpipes;
 	}
 
 	bool DPipeNamed::Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
-		return Write(SERVICE_CODE_RAW_CLIENT, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
+		return Write(DP_SERVICE_CODE_RAW_CLIENT, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
+	}
+
+	bool DPipeNamed::Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) {
+		DWORD nBytesWritten;
+		return Write(DP_SERVICE_CODE_RAW_CLIENT, lpBuffer, nNumberOfBytesToWrite, &nBytesWritten);
 	}
 
 	bool DPipeNamed::Write(unsigned int serviceCode, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
 		_packetPuilder.PrepareClientHeader(serviceCode, nNumberOfBytesToWrite);
-		bool bReturn = WriteInner(_packetPuilder.GetBufferHeaderOut(), _packetPuilder.BufferHeaderSize(), lpNumberOfByteWritten);
-		bReturn = WriteInner(lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
+		bool bReturn = WriteInner(_hWritePipe, _packetPuilder.GetBufferHeaderOut(), _packetPuilder.BufferHeaderSize(), lpNumberOfByteWritten);
+		bReturn = WriteInner(_hWritePipe, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
 		return bReturn;
 	}
 
+	bool DPipeNamed::Write(unsigned int serviceCode, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) {
+		DWORD nBytesWritten;
+		return Write(serviceCode, lpBuffer, nNumberOfBytesToWrite, &nBytesWritten);
+	}
+
 	bool DPipeNamed::WritePacketHeader(PacketHeader header) {
-		_packetPuilder.PrepareClientHeader(header.GetServiceCode(), header.DataSize());
+		_packetPuilder.PrepareClientHeader(header.GetCode(), header.DataSize());
 		return _packetPuilder.WriteHeader(_hWritePipe);
 	}
 
-	bool DPipeNamed::WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
-		return WriteInner(lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);;
+	bool DPipeNamed::WriteRaw(HANDLE hWriteHandle, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
+		return WriteInner(hWriteHandle, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
 	}
 
-	DPipeNamed::~DPipeNamed() {
-		Disconnect();
+	bool DPipeNamed::WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) {
+		return WriteInner(_hWritePipe, lpBuffer, nNumberOfBytesToWrite, lpNumberOfByteWritten);
+	}
+
+	bool DPipeNamed::WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) {
+		DWORD nBytesWritten;
+		return WriteInner(_hWritePipe, lpBuffer, nNumberOfBytesToWrite, &nBytesWritten);
+	}
+
+	IDPipe* DPipeNamed::CreateNewInstance() {
+		return new DPipeNamed(_sName, _nInBufferSize, _nOutBufferSize);
 	}
 
 #pragma endregion DPipeNamed

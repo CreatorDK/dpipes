@@ -14,7 +14,7 @@ private:
 	IDPipe* _dpipe = nullptr;
 	BoolTrigger messageReceivedTrigger;
 
-	void PacketHeaderReceviced(PacketHeader header) {
+	void PacketHeaderReceviced(IDPipe* pipe, PacketHeader header) {
 		DWORD nBytesToRead = header.DataSize();
 		DWORD nBytesRead;
 		char* buf = (char*)malloc(nBytesToRead);
@@ -46,7 +46,7 @@ public:
 		if (newConsole)
 			WriteTestName(_dpipe->Type());
 
-		_dpipe->SetPacketHeaderRecevicedCallback([this](PacketHeader header) { this->PacketHeaderReceviced(header); });
+		_dpipe->SetPacketHeaderRecevicedCallback([this](IDPipe* pipe, PacketHeader header) { this->PacketHeaderReceviced(pipe, header); });
 		WriteClientLine() << "1. Connecting to Pipe" << END_LINE;
 		_dpipe->Connect(params.handle);
 		wait(messageReceivedTrigger);

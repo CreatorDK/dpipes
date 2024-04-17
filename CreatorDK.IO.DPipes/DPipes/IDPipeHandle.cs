@@ -2,7 +2,7 @@
 {
     public interface IDPipeHandle
     {
-        DPIPE_TYPE GetType();
+        DP_TYPE GetType();
         string AsString();
     }
 }

@@ -150,34 +150,43 @@
     <ClCompile Include="dpipe_client_test17.cpp">
       <Filter>Исходные файлы\dpipe_client_tests</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpclient.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipe.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpipe.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpclient.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpipea.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipea.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpipebase.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipebase.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpipen.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipen.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpipepacket.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipepacket.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpmessanger.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpmessanger.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpserver.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpserver.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpstring.cpp">
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpmessangerbase.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
-    <ClCompile Include="..\DPipeSourceCPP\impl\dpwstring.cpp">
+    <ClCompile Include="dpipe_server_test_self_speedtest.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="dpipe_server_test_self_file_transfer.cpp">
+      <Filter>Исходные файлы\dpipe_server_tests</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpuser.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\heapdata.cpp">
       <Filter>Исходные файлы\dpipes</Filter>
     </ClCompile>
   </ItemGroup>
@@ -194,34 +203,37 @@
     <ClInclude Include="triggers.h">
       <Filter>Файлы заголовков\trigger</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpclient.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpclient.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpipe.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipe.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpipea.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipea.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpipebase.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipebase.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpipen.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipen.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpipepacket.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipepacket.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpmessanger.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpserver.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpserver.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpmessanger.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpstring.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpmessangerbase.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
-    <ClInclude Include="..\DPipeSourceCPP\dpwstring.h">
+    <ClInclude Include="..\..\DPipeSourceCPP\dpuser.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\heapdata.h">
       <Filter>Файлы заголовков\dpipes</Filter>
     </ClInclude>
   </ItemGroup>

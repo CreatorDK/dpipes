@@ -4,7 +4,7 @@
 namespace crdk {
 	namespace dpipes {
 
-		//Hanlde of anonymous duplex pipe
+		//Hanlde of anonymous duplex server
 #pragma region DPipeAnonymousHandle
 		class DPipeAnonymousHandle : public IDPipeHandle {
 		private:
@@ -12,8 +12,8 @@ namespace crdk {
 			DPipeAnonymousHandle(std::wstring handleString);
 		public:
 			DPipeAnonymousHandle(HANDLE hReadHandle, HANDLE hWriteHandle);
-			static DPipeAnonymousHandle* Start(std::wstring readHandleString, std::wstring writeHandleString);
-			static DPipeAnonymousHandle* Start(std::wstring handleString);
+			static DPipeAnonymousHandle* Create(std::wstring readHandleString, std::wstring writeHandleString);
+			static DPipeAnonymousHandle* Create(std::wstring handleString);
 		public:
 			DPipeAnonymousHandle(const DPipeAnonymousHandle&) = delete;
 			DPipeAnonymousHandle operator=(const DPipeAnonymousHandle& obj) = delete;
@@ -28,19 +28,19 @@ namespace crdk {
 			static bool IsAnonymous(const std::wstring handleString);
 			static bool IsHexHandle(const std::wstring handleString);
 			virtual std::wstring AsString() const override;
-			virtual DPIPE_TYPE GetType() const override;
+			virtual DP_TYPE GetType() const override;
 		};
 #pragma endregion DPipeAnonymousHandle
 
-		//Kind of Duplex pipe (idpipe implementation). Works over anonymous pipes
+		//Kind of Duplex server (idpipe implementation). Works over anonymous pipes
 #pragma region DPipeAnonymous
 		class DPipeAnonymous : public IDPipe {
 		public:
-			DPipeAnonymous(DWORD nInBufferSize = PIPE_BUFFERLENGTH_DEFAULT,
-				DWORD nOutBufferSize = PIPE_BUFFERLENGTH_DEFAULT);
+			DPipeAnonymous(DWORD nInBufferSize = DP_BUFFER_SIZE_DEFAULT,
+				DWORD nOutBufferSize = DP_BUFFER_SIZE_DEFAULT);
 			DPipeAnonymous(const std::wstring& sName,
-				DWORD nInBufferSize = PIPE_BUFFERLENGTH_DEFAULT,
-				DWORD nOutBufferSize = PIPE_BUFFERLENGTH_DEFAULT);
+				DWORD nInBufferSize = DP_BUFFER_SIZE_DEFAULT,
+				DWORD nOutBufferSize = DP_BUFFER_SIZE_DEFAULT);
 
 			DPipeAnonymous(const DPipeAnonymous&) = delete;
 			DPipeAnonymous operator=(const DPipeAnonymous& obj) = delete;
@@ -53,26 +53,33 @@ namespace crdk {
 			virtual void OnPipeClientConnect() override;
 		public:
 			virtual bool IsAlive() const override;
-			virtual DPIPE_MODE Mode() const override;
-			virtual DPIPE_TYPE Type() const override;
+			virtual DP_MODE Mode() const override;
+			virtual DP_TYPE Type() const override;
 			virtual bool Start() override;
 			virtual std::shared_ptr<IDPipeHandle> GetHandle() override;
 			virtual std::wstring GetHandleString() override;
 
 			virtual bool Connect(IDPipeHandle* pHandle) override;
-			virtual bool Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize) override;
-			virtual bool Connect(DPipeAnonymousHandle* pHandle);
-			virtual bool Connect(DPipeAnonymousHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize);
+			virtual bool Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix = 0) override;
+			virtual bool ConnectAnonymus(DPipeAnonymousHandle* pHandle);
+			virtual bool ConnectAnonymus(DPipeAnonymousHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix = 0);
 			virtual bool Connect(std::wstring handleString) override;
-			virtual bool Connect(std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize) override;
+			virtual bool Connect(std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix = 0) override;
 
-			virtual void DisconnectPipe() override;
-
+			virtual void DisconnectPipe(bool isAlive) override;
+			virtual std::shared_ptr<HeapAllocatedData> Read(PacketHeader header) override;
 			virtual bool Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped) override;
-			virtual bool Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) override;
+			virtual bool Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead) override;
+			virtual bool Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) override;
 			virtual bool Write(unsigned int serviceCode, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) override;
+			virtual bool Write(unsigned int serviceCode, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) override;
+			virtual bool Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) override;
+			virtual bool Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) override;
 			virtual bool WritePacketHeader(PacketHeader header) override;
+			virtual bool WriteRaw(HANDLE hWriteHandle, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) override;
 			virtual bool WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) override;
+			virtual bool WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) override;
+			virtual IDPipe* CreateNewInstance() override;
 		};
 #pragma endregion DPipeAnonymous
 

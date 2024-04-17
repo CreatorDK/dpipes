@@ -70,15 +70,19 @@ crdk::triggers::IntTrigger::IntTrigger(int startNumber, int targetNumber, std::f
 }
 
 void crdk::triggers::IntTrigger::Increase(int number) {
-    _current += number;
 
-    if (_comparator(_current, _target))
-        _status = TRIGGER_STATUS::COMPLETE;
+    _mutex.lock();
+        _current += number;
+        if (_comparator(_current, _target))
+            _status = TRIGGER_STATUS::COMPLETE;
+    _mutex.unlock();
 }
 
 void crdk::triggers::IntTrigger::Decrease(int number) {
-    _current -= number;
 
-    if (_comparator(_current, _target))
-        _status = TRIGGER_STATUS::COMPLETE;
+    _mutex.lock();
+        _current -= number;
+        if (_comparator(_current, _target))
+            _status = TRIGGER_STATUS::COMPLETE;
+    _mutex.unlock();
 }

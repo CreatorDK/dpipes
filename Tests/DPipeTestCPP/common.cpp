@@ -14,7 +14,7 @@ void RunClientProccess(STARTUPINFO* si, PROCESS_INFORMATION* pi, start_params_se
             path = pair.second;
             continue;
         }
-        else if (pair.first == L"/attach_client" && pair.second.length() > 0) {
+        else if (pair.first == L"/attach_client") {
             flags = flags + L"/attach ";
             continue;
         }
@@ -70,11 +70,11 @@ void ServerTest::ExecuteWrapper(start_params_server& params) {
     Execute(params);
 }
 
-void ServerTest::WriteTestName(const DPIPE_TYPE type) const {
-    if (type == DPIPE_TYPE::ANONYMOUS_PIPE) 
+void ServerTest::WriteTestName(const DP_TYPE type) const {
+    if (type == DP_TYPE::ANONYMOUS_PIPE) 
         std::wcout << L"Anonymous Pipe Server" << std::endl;
     else 
-        std::wcout << "Named Pipe Server"  << std::endl;
+        std::wcout << L"Named Pipe Server"  << std::endl;
 
     std::wcout << _name << L" (" << _title << ")" << std::endl;
     std::wcout << _description << std::endl;
@@ -91,8 +91,8 @@ void ClientTest::ExecuteWrapper(start_params_client& params) {
     Execute(params);
 }
 
-void ClientTest::WriteTestName(const DPIPE_TYPE type) const {
-    if (type == DPIPE_TYPE::ANONYMOUS_PIPE) 
+void ClientTest::WriteTestName(const DP_TYPE type) const {
+    if (type == DP_TYPE::ANONYMOUS_PIPE) 
         std::wcout << L"Anonymous Pipe Client" << std::endl;
     else
         std::wcout << L"Named Pipe Client"  << std::endl;

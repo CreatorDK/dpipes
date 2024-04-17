@@ -19,9 +19,9 @@ namespace DPipeTestCS
             Description = description;
         }
 
-        public void WriteTestName(DPIPE_TYPE pipeType)
+        public void WriteTestName(DP_TYPE pipeType)
         {
-            if (pipeType == DPIPE_TYPE.ANONYMUS_PIPE)
+            if (pipeType == DP_TYPE.ANONYMOUS_PIPE)
                 Console.WriteLine("Anonymus Pipe Server");
 
             else

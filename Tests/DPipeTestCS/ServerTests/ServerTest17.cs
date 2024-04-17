@@ -9,7 +9,7 @@ namespace DPipeTestCS.ServerTests
     {
         public ServerTest17(string testName, string title, string description) : base(testName, title, description) { }
 
-        DPipeNamed? _dpipeNamed;
+        DPNamed? _dpipeNamed;
         BoolTrigger clientConnectedTrigger = new(); 
 
         void OnClientConnect(PacketHeader header)
@@ -21,12 +21,12 @@ namespace DPipeTestCS.ServerTests
         public override void Execute(StartParamsServer startParams)
         {
             WriteTestName(startParams.PIPE_TYPE);
-            _dpipeNamed = DPipeNamed.Create("\\\\.\\pipe\\test-pipe-123");
+            _dpipeNamed = DPNamed.Create("\\\\.\\pipe\\test-pipe-123");
 
             if (_dpipeNamed == null)
                 return;
 
-            _dpipeNamed.OnClientConnectCallback = OnClientConnect;
+            _dpipeNamed.OnOtherSideConnectCallback = OnClientConnect;
             _dpipeNamed.StartWin32();
 
             _dpipeNamed.UseRemote = true;

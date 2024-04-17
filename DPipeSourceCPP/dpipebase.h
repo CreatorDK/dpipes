@@ -1,18 +1,50 @@
 #pragma once
 #include <string>
-#include <list>
+#include <map>
 #include <type_traits>
 #include <exception>
-#include <windows.h>
 #include <sstream>
 #include <thread>
 #include <functional>
+#include <shared_mutex>
 #include "dpipepacket.h"
+#include "heapdata.h"
 
 namespace crdk {
 	namespace dpipes {
 
-#define PIPE_BUFFERLENGTH_DEFAULT 19
+#define DP_BUFFER_SIZE_DEFAULT						0
+
+#define DP_REQUEST									64
+#define DP_RESPONSE									128
+
+#define DP_INFO_DATA								10
+#define DP_INFO_STRING								11
+#define DP_WARNING_DATA								20
+#define DP_WARNING_STRING							21
+#define DP_ERROR_DATA								30
+#define DP_ERROR_STRING								31
+#define DP_MESSAGE_DATA								40
+#define DP_MESSAGE_STRING							41
+
+#define DP_REQUEST_SIZE								32
+#define DP_RESPONSE_SIZE							32
+
+#define DP_DATA_BINARY								0
+#define DP_DATA_STRING								1
+#define DP_DATA_WSTRING								2
+#define DP_DATA_STRING_JSON							3
+#define DP_DATA_WSRTING_JSON						4
+
+#define DP_HANDLER_NOT_FOUND						404
+#define DP_REQUEST_TIMEOUT							408
+
+#define DP_ENCODING_MASK							2139095040
+#define DP_ENCODING_UTF8							0
+#define DP_ENCODING_UNICODE							1
+
+#define DP_MEMORY_DESCRIPTOR_ALLOCATION_LIMIT		4096			// 4 Kb
+#define DP_MEMORY_DATA_ALLOCATION_LIMIT				33554432		// 32 MB
 
 		//Prototypes
 #pragma region prototypes
@@ -20,42 +52,24 @@ namespace crdk {
 		class IDPipe;
 #pragma endregion prototypes
 
-		//Duplex pipe type enumeration
-#pragma region DPIPE_TYPE
-		enum DPIPE_TYPE {
+		//Duplex server type enumeration
+#pragma region DP_TYPE
+		enum DP_TYPE {
 			ANONYMOUS_PIPE = 1,
 			NAMED_PIPE = 2
 		};
-#pragma endregion DPIPE_TYPE
+#pragma endregion DP_TYPE
 
-		//Duplex pipe mode enumeration
-#pragma region DPIPE_MODE
-		enum DPIPE_MODE {
+		//Duplex server mode enumeration
+#pragma region DP_MODE
+		enum DP_MODE {
 			UNSTARTED = 0,
 			INNITIATOR = 1,
 			CLIENT = 2
 		};
-#pragma endregion DPIPE_MODE
+#pragma endregion DP_MODE
 
-		//Struct contains buffer adress and size. Depending on flag keepAllocatedMemory at destructor free or not free allocated memory
-#pragma region HeapAllocatedData
-		struct HeapAllocatedData {
-		public:
-			HeapAllocatedData(DWORD size, bool keepAllocatedMemory = false);
-			~HeapAllocatedData();
-			HeapAllocatedData(const HeapAllocatedData&) = delete;
-			HeapAllocatedData operator=(const HeapAllocatedData& obj) = delete;
-		private:
-			void* _data = nullptr;
-			DWORD _size = 0;
-		public:
-			bool keepAllocatedMemory = false;
-			void* data() const;
-			DWORD size() const;
-		};
-#pragma endregion HeapAllocatedData
-
-		//Base handle pipe class. Initiator class creates handle when create the pipe, second class uses handle to connect
+		//Base handle server class. Initiator class creates handle when create the server, second class uses handle to connect
 #pragma region IDPipeHandle
 		class IDPipeHandle {
 		public:
@@ -64,7 +78,7 @@ namespace crdk {
 			IDPipeHandle operator=(const IDPipeHandle& obj) = delete;
 			virtual ~IDPipeHandle();
 		public:
-			virtual DPIPE_TYPE GetType() const = 0;
+			virtual DP_TYPE GetType() const = 0;
 			virtual std::wstring AsString() const = 0;
 		};
 #pragma endregion IDPipeHandle
@@ -73,13 +87,13 @@ namespace crdk {
 #pragma region IDPipe
 		class IDPipe {
 		public:
-			IDPipe(const std::wstring& sName, DWORD nInBufferSize = PIPE_BUFFERLENGTH_DEFAULT, DWORD nOutBufferSize = PIPE_BUFFERLENGTH_DEFAULT);
+			IDPipe(const std::wstring& sName, DWORD mtu, DWORD nInBufferSize = DP_BUFFER_SIZE_DEFAULT, DWORD nOutBufferSize = DP_BUFFER_SIZE_DEFAULT);
 			IDPipe(const IDPipe&) = delete;
 			IDPipe operator=(const IDPipe& obj) = delete;
 			virtual ~IDPipe();
 		protected:
-			DPIPE_TYPE _type = DPIPE_TYPE::ANONYMOUS_PIPE;
-			DPIPE_MODE _mode = DPIPE_MODE::UNSTARTED;
+			DP_TYPE _type = DP_TYPE::ANONYMOUS_PIPE;
+			DP_MODE _mode = DP_MODE::UNSTARTED;
 			std::wstring _sName;
 
 			PacketBuilder _packetPuilder;
@@ -94,64 +108,101 @@ namespace crdk {
 			DWORD _nBytesToRead = 0;
 			DWORD _nLastError = 0;
 
-			HANDLE	_hReadPipe = nullptr;		// Handle to a read end of a pipe.
-			HANDLE	_hWritePipe = nullptr;		// Handle to a write end of a pipe.
+			HANDLE	_hReadPipe = nullptr;		// Handle to a read end of a server.
+			HANDLE	_hWritePipe = nullptr;		// Handle to a write end of a server.
 
 			bool _bIsAlive = false;
 			bool _bListening = false;
 			bool _bOtherSideDisconnecting = false;
 
 			void* _skipBuffer = nullptr;
-			DWORD _skipBufferSize = SKIP_BUFFER_SIZE;
+			DWORD _skipBufferSize = DP_SKIP_BUFFER_SIZE;
 
-			std::function<void(PacketHeader)> _onClientConnectCallBack;
-			std::function<void(PacketHeader)> _onPartnerDisconnectCallBack;
-			std::function<void(PacketHeader)> _onPacketHeaderReceivedCallBack;
+			bool _clientEmulating = false;
+			DWORD _mtu;
+
+			std::function<void(IDPipe* sender, PacketHeader header)> _onPingReceivedCallBack;
+			std::function<void(IDPipe* sender, PacketHeader header)> _onPongReceivedCallBack;
+			std::function<void(IDPipe* sender, PacketHeader header)> _onOtherSideConnectCallBack;
+			std::function<void(IDPipe* sender, PacketHeader header)> _onOtherSideDisconnectCallBack;
+			std::function<void(IDPipe* sender, PacketHeader header)> _onPacketHeaderReceivedCallBack;
+			std::function<void(IDPipe* sender, PacketHeader header)> _onConfigurationReceivedCallBack;
 
 			virtual std::wstring GetName() const;
 			virtual DWORD BytesToRead() const;
 			virtual DWORD GetLastErrorDP() const;
 
 			virtual void ServicePacketReceived(PacketHeader ph);
+
 			virtual void OnClientConnect(PacketHeader ph);
 			virtual void OnPipeClientConnect() = 0;
 			virtual void OnOtherSideDisconnect(PacketHeader ph);
 			virtual void OnOtherSideDisconnectPipe();
-
 			virtual void OnPacketHeaderReceived(PacketHeader ph);
-			virtual void OnTerminating();
+			virtual void OnTerminating(PacketHeader ph);
+
+			virtual void OnPingReceived(PacketHeader ph);
+			virtual void OnPongReceived(PacketHeader ph);
+			virtual void OnMtuRequest(PacketHeader ph);
+			virtual void OnMtuResponse(PacketHeader ph);
+
+			virtual void OnConfigurationReceived(PacketHeader ph);
+			virtual void SendConfiguration(LPVOID lpBuffer, DWORD bytes);
+
+			virtual void SendMtuRequest(HANDLE& hWriteHandle, DWORD mtu);
+			virtual void SendMtuResponse(HANDLE& hWriteHandle, DWORD mtu);
 		public:
+			//public flags
 			virtual bool Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead, LPOVERLAPPED lpOverlapped) = 0;
+			virtual bool Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead, LPDWORD lpNumberOfBytesRead) = 0;
+			virtual bool Read(LPVOID lpBuffer, DWORD nNumberOfBytesToRead) = 0;
+			virtual void ReadFrom(IDPipe* source, DWORD nNumberOfBytesToRead, DWORD nBuffurSize);
+			virtual std::shared_ptr<HeapAllocatedData> Read(PacketHeader header) = 0;
 			virtual bool WritePacketHeader(PacketHeader header) = 0;
+			virtual bool WriteRaw(HANDLE hWriteHandle, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) = 0;
 			virtual bool WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) = 0;
+			virtual bool WriteRaw(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) = 0;
 			virtual bool Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) = 0;
-			virtual bool Write(unsigned int serviceByte, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) = 0; // <- You stop here!!!!
-			virtual DPIPE_MODE Mode() const = 0;
-			virtual DPIPE_TYPE Type() const = 0;
+			virtual bool Write(LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) = 0;
+			virtual bool Write(unsigned int serviceByte, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite, LPDWORD lpNumberOfByteWritten) = 0;
+			virtual bool Write(unsigned int serviceByte, LPCVOID lpBuffer, DWORD nNumberOfBytesToWrite) = 0;
+			virtual void CopyTo(IDPipe* dest, DWORD nNumberOfBytesToRead, DWORD nBuffurSize);
+
+			virtual DP_MODE Mode() const = 0;
+			virtual DP_TYPE Type() const = 0;
 			virtual bool IsAlive() const = 0;
 			virtual std::shared_ptr<IDPipeHandle> GetHandle() = 0;
 			virtual std::wstring GetHandleString() = 0;
 
+			virtual bool SendPing(HANDLE& hWriteHandle);
+			virtual bool SendPong(HANDLE& hWriteHandle);
+
 			virtual bool Start() = 0;
 
 			virtual bool Connect(IDPipeHandle* pHandle) = 0;
-			virtual bool Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize) = 0;
+			virtual bool Connect(IDPipeHandle* pHandle, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix = 0) = 0;
 			virtual bool Connect(const std::wstring handleString) = 0;
-			virtual bool Connect(const std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize) = 0;
+			virtual bool Connect(const std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix = 0) = 0;
 
 			virtual void Disconnect();
-			virtual void Disconnect(LPCVOID pConnectData, DWORD nConnectDataSize);
-			virtual void DisconnectPipe() = 0;
+			virtual void Disconnect(LPCVOID pConnectData, DWORD nConnectDataSize, DWORD prefix = 0);
+			virtual void DisconnectPipe(bool isAlive) = 0;
 
-			virtual void SetClientConnectCallback(std::function<void(PacketHeader ph)> function);
-			virtual void SetOtherSideDisconnectCallback(std::function<void(PacketHeader ph)> function);
-			virtual void SetPacketHeaderRecevicedCallback(std::function<void(PacketHeader ph)> function);
+			virtual void SetPingReceivedCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function);
+			virtual void SetPongReceivedCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function);
+			virtual void SetClientConnectCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function);
+			virtual void SetOtherSideDisconnectCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function);
+			virtual void SetPacketHeaderRecevicedCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function);
+			virtual void SetConfigurationRecevicedCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function);
 
 			virtual void Skip(DWORD nBytesToSkip);
 			virtual void Skip(PacketHeader header);
 
 			virtual HANDLE ReadHandle();
 			virtual HANDLE WriteHandle();
+
+			virtual IDPipe* CreateNewInstance() = 0;
+
 		};
 #pragma endregion IDPipe
 

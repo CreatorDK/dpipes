@@ -2,7 +2,8 @@
   "profiles": {
     "DPipeTestCS": {
       "commandName": "Project",
-      "commandLineArgs": "server all all"
+      "commandLineArgs": "server all all",
+      "nativeDebugging": false
     }
   }
 }

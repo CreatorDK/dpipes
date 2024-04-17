@@ -13,5 +13,104 @@
       <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
       <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
     </Filter>
+    <Filter Include="Исходные файлы\dpipes">
+      <UniqueIdentifier>{7ee64a8f-2af6-4d21-9077-d25a47219c6b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Файлы заголовков\dpipes">
+      <UniqueIdentifier>{cf952f71-29e5-4906-ba28-356dac584355}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="FormMain.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="program.cpp">
+      <Filter>Исходные файлы</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpclient.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipe.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipea.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipebase.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipen.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpipepacket.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpmessanger.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpserver.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpmessangerbase.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\dpuser.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\DPipeSourceCPP\impl\heapdata.cpp">
+      <Filter>Исходные файлы\dpipes</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="FormMain.h">
+      <Filter>Файлы заголовков</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpuser.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpclient.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipe.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipea.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipebase.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipen.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpipepacket.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpmessanger.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpmessangerbase.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\dpserver.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\DPipeSourceCPP\heapdata.h">
+      <Filter>Файлы заголовков\dpipes</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="..\..\..\..\..\..\tsbConnectToPipe.Image.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="..\..\..\..\..\..\tsbStartClient.Image.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="..\..\..\..\..\..\tsbStartServer.Image.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
+    <Image Include="..\..\..\..\..\..\tsbStopServer.Image.png">
+      <Filter>Файлы ресурсов</Filter>
+    </Image>
   </ItemGroup>
 </Project>

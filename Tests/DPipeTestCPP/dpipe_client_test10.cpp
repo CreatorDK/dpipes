@@ -12,18 +12,21 @@ public:
 private:
 
 	IDPipe* _dpipe = nullptr;
-	DPWString* _dpwstring = nullptr;
+	DPMessanger* _dpmessanger = nullptr;
 
 	BoolTrigger disconnectTrigger;
 	BoolTrigger messageReceivedTrigger;
 	BoolTrigger received10MessagesSyncTrigger;
 	BoolTrigger received10MessagesAsyncTrigger;
 
-	static void SendAsyncComplete() {
+	static void SendAsyncComplete(IDPipe* pipe) {
 
 	}
 
-	void OnMessageReceivedCallback(wstring message) {
+	void OnMessageReceivedCallback(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) {
+
+		wstring message = _dpmessanger->GetWString(header, data);
+
 		if (message == L"Hello, Client!") {
 			WriteClientLine() << "2. Greeting Received" << END_LINE;
 			messageReceivedTrigger.SetComplete();
@@ -34,28 +37,28 @@ private:
 			received10MessagesAsyncTrigger.SetComplete();
 	}
 
-	static void WriteGreetingToServerFromThreadSync(DPWString* dpstring) {
+	static void WriteGreetingToServerFromThreadSync(DPMessanger* dpstring) {
 		wstringstream ss;
 		std::thread::id this_id = std::this_thread::get_id();
 		ss << "Hello, from " << this_id << "!";
 		wstring message(ss.str());
-		dpstring->SendAsync(message);
+		dpstring->SendMessageString(message);
 	}
 
-	static void WriteGreetingToServerFromThreadASync(DPWString* dpstring) {
+	static void WriteGreetingToServerFromThreadASync(DPMessanger* dpstring) {
 		wstringstream ss;
 		std::thread::id this_id = std::this_thread::get_id();
 		ss << "Hello, from " << this_id << "!";
 		wstring message(ss.str());
-		auto callback = []() { SendAsyncComplete(); };
-		dpstring->SendAsync(message, callback);
+		auto callback = [](IDPipe* pipe) { SendAsyncComplete(pipe); };
+		dpstring->SendMessageStringAsync(message, callback);
 	}
 
 	void WriteFrom10ThreadsSync() const {
 		for (int i = 0; i < 10; i++) {
 			if (newConsole)
 				WriteClientLine() << "Creating thread (Send sync) " << to_string(i) << END_LINE;
-			std::thread th(WriteGreetingToServerFromThreadSync, _dpwstring);
+			std::thread th(WriteGreetingToServerFromThreadSync, _dpmessanger);
 			th.detach();
 		}
 	}
@@ -64,13 +67,16 @@ private:
 		for (int i = 0; i < 10; i++) {
 			if (newConsole)
 				WriteClientLine() << "Creating thread (Send async) " << to_string(i) << END_LINE;
-			std::thread th(WriteGreetingToServerFromThreadASync, _dpwstring);
+			std::thread th(WriteGreetingToServerFromThreadASync, _dpmessanger);
 			th.detach();
 		}
 	}
 
-	void ServerDisconnectCallback(wstring disconnectMessage) {
-		WriteClientLineW() << L"7. Server Disconecting with message: " << disconnectMessage << END_LINE;
+	void ServerDisconnectCallback(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) {
+
+		wstring message = _dpmessanger->GetWString(header, data);
+
+		WriteClientLineW() << L"7. Server Disconecting with message: " << message << END_LINE;
 		disconnectTrigger.SetComplete();
 	}
 
@@ -80,11 +86,13 @@ public:
 		if (newConsole)
 			WriteTestName(_dpipe->Type());
 
-		_dpwstring = new DPWString(_dpipe, true);
-		_dpwstring->SetOnMessageReceivedHandler([this](wstring message) { this->OnMessageReceivedCallback(message); });
-		_dpwstring->SetOnOtherSideDisconnectHandler([this](wstring disconnectMessage) { ServerDisconnectCallback(disconnectMessage); });
+		_dpmessanger = new DPMessanger(_dpipe, true);
+		_dpmessanger->SetMessageStringReceivedHandler([this](IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data)
+			{ this->OnMessageReceivedCallback(pipe, header, data); });
+		_dpmessanger->SetOnOtherSideDisconnectHandler([this](IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data)
+			{ ServerDisconnectCallback(pipe, header, data); });
 		WriteClientLine() << "1. Connecting to Pipe" << END_LINE;
-		_dpwstring->Connect(params.handle, L"I am connect, motherfucker!");
+		_dpmessanger->Connect(params.handle, L"I am connect, motherfucker!");
 		wait(messageReceivedTrigger);
 
 		WriteClientLine() << "3. Sending message from 10 thread sync" << END_LINE;
@@ -101,7 +109,7 @@ public:
 		cout << "Complete" << endl;
 
 		wait(disconnectTrigger);
-		_dpwstring->Disconnect();
+		_dpmessanger->Disconnect();
 
 		if (newConsole)
 			system("pause");
@@ -112,8 +120,8 @@ TestRegistrationClient ClientTest10() {
 	TestRegistrationClient registration;
 	registration.enabled = true;
 	registration.name = L"Test10";
-	registration.title = L"DPWString server - async, client - async";
-	registration.description = L"Description: Testing scenario when DPWString server and client handling messages in async mode";
+	registration.title = L"DPMessanger server - async, client - async";
+	registration.description = L"Description: Testing scenario when DPMessanger server and client handling messages in async mode";
 	registration.createHandler = [registration]() { return new ClientTest10Class(registration); };
 	return registration;
 }

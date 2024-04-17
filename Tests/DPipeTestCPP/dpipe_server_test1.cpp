@@ -14,7 +14,7 @@ private:
 	BoolTrigger connectTrigger;
 	BoolTrigger disconnectTrigger;
 	
-	void ClientConnectCallback(PacketHeader packet) {
+	void ClientConnectCallback(IDPipe* pipe, PacketHeader packet) {
 		DWORD nBytesWritten;
 		WriteServerLine() << "1. Client Connected" << END_LINE;
 		WriteServerLine() << "2. Writing Greeting to Client" << END_LINE;
@@ -25,7 +25,7 @@ private:
 		connectTrigger.SetComplete();
 	}
 
-	void PacketHeaderRecevicedCallback(PacketHeader header) {
+	void PacketHeaderRecevicedCallback(IDPipe* pipe, PacketHeader header) {
 		DWORD nBytesToRead = header.DataSize();
 		DWORD nBytesRead;
 		char* buf = (char*)malloc(nBytesToRead);
@@ -42,7 +42,7 @@ private:
 		free(buf);
 	}
 
-	void ClientDisconnectCallback(PacketHeader packet) {
+	void ClientDisconnectCallback(IDPipe* pipe, PacketHeader packet) {
 		WriteServerLine() << "4. Client Disconecting" << END_LINE;
 		disconnectTrigger.SetComplete();
 	}
@@ -52,9 +52,9 @@ public:
 	{
 		WriteTestName(params.pipeType);
 		_dpipe = DPipeBuilder::Create(params.pipeType);
-		_dpipe->SetClientConnectCallback([this](PacketHeader packet) { ClientConnectCallback(packet); });
-		_dpipe->SetPacketHeaderRecevicedCallback([this](PacketHeader packet) { PacketHeaderRecevicedCallback(packet); });
-		_dpipe->SetOtherSideDisconnectCallback([this](PacketHeader packet) { ClientDisconnectCallback(packet); });
+		_dpipe->SetClientConnectCallback([this](IDPipe* pipe, PacketHeader packet) { ClientConnectCallback(pipe, packet); });
+		_dpipe->SetPacketHeaderRecevicedCallback([this](IDPipe* pipe, PacketHeader packet) { PacketHeaderRecevicedCallback(pipe, packet); });
+		_dpipe->SetOtherSideDisconnectCallback([this](IDPipe* pipe, PacketHeader packet) { ClientDisconnectCallback(pipe, packet); });
 		_dpipe->Start();
 
 		auto handle = _dpipe->GetHandle();

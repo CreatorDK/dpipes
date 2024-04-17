@@ -22,8 +22,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="CreatorDK.DTE" Version="1.0.0" />
-    <PackageReference Include="CreatorDK.Triggers" Version="1.0.0" />
+    <PackageReference Include="CreatorDK.DTE" Version="1.0.1" />
+    <PackageReference Include="CreatorDK.Triggers" Version="1.0.3" />
     <PackageReference Include="Microsoft.VisualStudio.Interop" Version="17.9.37000" />
   </ItemGroup>
 

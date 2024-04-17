@@ -131,7 +131,7 @@ namespace DPipeTestCS.ServerTests
             if (_dpipe == null)
                 return;
 
-            _dpipe.OnClientConnectCallback = OnClientConnect;
+            _dpipe.OnOtherSideConnectCallback = OnClientConnect;
             _dpipe.OnPacketHeaderReceivedCallback = OnPacketHeaderReceived;
             _dpipe.OnOtherSideDisconnectCallback = OnOtherSideDisconnect;
 

@@ -27,11 +27,11 @@ private:
 
 	typedef std::chrono::high_resolution_clock Time;
 
-	void ClientConnectCallback(PacketHeader packet) {
+	void ClientConnectCallback(IDPipe* pipe, PacketHeader packet) {
 		WriteServerLine() << "1. Client Connected" << END_LINE;
 	}
 
-	void ClientDisconnectCallback(PacketHeader packet) {
+	void ClientDisconnectCallback(IDPipe* pipe, PacketHeader packet) {
 		WriteServerLine() << "2. Client Disconecting" << END_LINE;
 	}
 
@@ -76,6 +76,7 @@ private:
 	}
 
 	wstring GetSize(long long bytes) {
+
 		long double bytesF = bytes / 1.l;
 
 		if (bytesF > 1099511627776.l) {
@@ -113,7 +114,7 @@ private:
 		}
 	}
 
-	void PacketHeaderRecevicedCallback(PacketHeader header) {
+	void PacketHeaderRecevicedCallback(IDPipe* pipe, PacketHeader header) {
 
 		DWORD dataSize = header.DataSize();
 
@@ -123,8 +124,9 @@ private:
 
 		auto readBeginTimePoint = Time::now();
 
-		DWORD nBytesWritten;
-		_dpipe->Read(_buffer, dataSize, &nBytesWritten, NULL);
+		DWORD nBytesRead;
+
+		bool bRet = _dpipe->Read(_buffer, dataSize, &nBytesRead, NULL);
 
 		auto duraction = Time::now() - readBeginTimePoint;
 
@@ -160,9 +162,9 @@ public:
 		WriteTestName(params.pipeType);
 		_dpipe = DPipeBuilder::Create(params.pipeType, L"\\\\.\\pipe\\test-pipe-123");
 
-		_dpipe->SetClientConnectCallback([this](PacketHeader packet) { ClientConnectCallback(packet); });
-		_dpipe->SetPacketHeaderRecevicedCallback([this](PacketHeader packet) { PacketHeaderRecevicedCallback(packet); });
-		_dpipe->SetOtherSideDisconnectCallback([this](PacketHeader packet) { ClientDisconnectCallback(packet); });
+		_dpipe->SetClientConnectCallback([this](IDPipe* pipe, PacketHeader packet) { ClientConnectCallback(pipe, packet); });
+		_dpipe->SetPacketHeaderRecevicedCallback([this](IDPipe* pipe, PacketHeader packet) { PacketHeaderRecevicedCallback(pipe, packet); });
+		_dpipe->SetOtherSideDisconnectCallback([this](IDPipe* pipe, PacketHeader packet) { ClientDisconnectCallback(pipe, packet); });
 
 		auto blockSizeIt = params.flags.find(L"/s");
 		if (blockSizeIt != params.flags.end())

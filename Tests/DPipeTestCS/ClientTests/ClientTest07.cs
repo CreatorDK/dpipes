@@ -10,7 +10,7 @@ namespace DPipeTestCS.ClientTests
         public ClientTest07(string testName, string title, string description) : base(testName, title, description) { }
 
         DPipe? _dpipe;
-        DPipeMessanger? _dpipeMessanger;
+        DPMessanger? _dpipeMessanger;
 
         BoolTrigger messageReceivedTrigger = new();
         BoolTrigger received10MessagesSyncTrigger = new();
@@ -45,8 +45,10 @@ namespace DPipeTestCS.ClientTests
                 WriteLine("2. Greeting Received");
                 messageReceivedTrigger.SetComplete();
             }
+
             else if (message == "MessagesReceivedSync!")
                 received10MessagesSyncTrigger.SetComplete();
+
             else if (message == "MessagesReceivedAsync!")
                 received10MessagesAsyncTrigger.SetComplete();
         }
@@ -64,7 +66,7 @@ namespace DPipeTestCS.ClientTests
             if (NewConsole)
                 WriteTestName(_dpipe.Type);
 
-            _dpipeMessanger = new DPipeMessanger(_dpipe, Encoding.Unicode, false);
+            _dpipeMessanger = new DPMessanger(_dpipe, Encoding.Unicode, false);
             _dpipeMessanger.OnMessageStringReceived = OnMessageStringReceived;
             WriteLine("1. Connecting to Pipe");
             _dpipeMessanger.Connect(startParams.PipeHandle, "I am connect, motherfucker!");

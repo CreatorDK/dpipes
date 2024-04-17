@@ -13,7 +13,7 @@ private:
 	DPipeNamed* _dpipeNamed = nullptr;
 	BoolTrigger clientConnectedTrigger;
 
-	void ClientConnectCallback(PacketHeader packetHeader) {
+	void ClientConnectCallback(IDPipe* pipe, PacketHeader packetHeader) {
 		WriteServerLine() << "1. Client Connected" << END_LINE;
 		clientConnectedTrigger.SetComplete();
 	}
@@ -25,7 +25,7 @@ public:
 		_dpipeNamed = DPipeNamed::Create(L"\\\\.\\pipe\\test-pipe-123");
 		_dpipeNamed->SetUseRemote(true);
 
-		_dpipeNamed->SetClientConnectCallback([this](PacketHeader packet) { ClientConnectCallback(packet); });
+		_dpipeNamed->SetClientConnectCallback([this](IDPipe* pipe, PacketHeader packet) { ClientConnectCallback(pipe, packet); });
 
 		_dpipeNamed->Start();
 

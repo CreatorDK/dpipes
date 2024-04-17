@@ -12,16 +12,19 @@ public:
 	{ }
 private:
 	IDPipe* _dpipe = nullptr;
-	DPString* _dpstring = nullptr;
+	DPMessanger* _dpmessanger = nullptr;
 	BoolTrigger messageReceivedTrigger;
 	BoolTrigger received10MessagesSyncTrigger;
 	BoolTrigger received10MessagesAsyncTrigger;
 
-	static void SendAsyncComplete() {
+	static void SendAsyncComplete(IDPipe* pipe) {
 
 	}
 
-	void OnMessageReceivedCallback(string message) {
+	void OnMessageReceivedCallback(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) {
+
+		string message = _dpmessanger->GetString(header, data);
+
 		if (message == "Hello, Client!") {
 			WriteClientLine() << "2. Greeting Received" << END_LINE;
 			messageReceivedTrigger.SetComplete();
@@ -32,28 +35,28 @@ private:
 			received10MessagesAsyncTrigger.SetComplete();
 	}
 
-	static void WriteGreetingToServerFromThreadSync(DPString* dpstring) {
+	static void WriteGreetingToServerFromThreadSync(DPMessanger* dpstring) {
 		stringstream ss;
 		std::thread::id this_id = std::this_thread::get_id();
 		ss << "Hello, from " << this_id << "!";
 		string message(ss.str());
-		dpstring->SendAsync(message);
+		dpstring->SendMessageString(message);
 	}
 
-	static void WriteGreetingToServerFromThreadASync(DPString* dpstring) {
+	static void WriteGreetingToServerFromThreadASync(DPMessanger* dpstring) {
 		stringstream ss;
 		std::thread::id this_id = std::this_thread::get_id();
 		ss << "Hello, from " << this_id << "!";
 		string message(ss.str());
-		auto callback = []() { SendAsyncComplete(); };
-		dpstring->SendAsync(message, callback);
+		auto callback = [](IDPipe* pipe) { SendAsyncComplete(pipe); };
+		dpstring->SendMessageStringAsync(message, callback);
 	}
 
 	void WriteFrom10ThreadsSync() const {
 		for (int i = 0; i < 10; i++) {
 			if (newConsole)
 				WriteClientLine() << "Creating thread (Send sync) " << to_string(i) << END_LINE;
-			std::thread th(WriteGreetingToServerFromThreadSync, _dpstring);
+			std::thread th(WriteGreetingToServerFromThreadSync, _dpmessanger);
 			th.detach();
 		}
 	}
@@ -62,7 +65,7 @@ private:
 		for (int i = 0; i < 10; i++) {
 			if (newConsole)
 				WriteClientLine() << "Creating thread (Send async) " << to_string(i) << END_LINE;
-			std::thread th(WriteGreetingToServerFromThreadASync, _dpstring);
+			std::thread th(WriteGreetingToServerFromThreadASync, _dpmessanger);
 			th.detach();
 		}
 	}
@@ -73,10 +76,11 @@ public:
 		if (newConsole)
 			WriteTestName(_dpipe->Type());
 
-		_dpstring = new DPString(_dpipe, false);
-		_dpstring->SetOnMessageReceivedHandler([this](string message) { this->OnMessageReceivedCallback(message); });
+		_dpmessanger = new DPMessanger(_dpipe, false);
+		_dpmessanger->SetMessageStringReceivedHandler([this](IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) 
+			{ this->OnMessageReceivedCallback(pipe, header, data); });
 		WriteClientLine() << "1. Connecting to Pipe" << END_LINE;
-		_dpstring->Connect(params.handle, "I am connect, motherfucker!");
+		_dpmessanger->Connect(params.handle, "I am connect, motherfucker!");
 		wait(messageReceivedTrigger);
 
 		WriteClientLine() << "3. Sending message from 10 thread sync" << END_LINE;
@@ -93,7 +97,7 @@ public:
 		cout << "Complete" << endl;
 
 		WriteClientLine() << "7. Disconnecting From Pipe" << END_LINE;
-		_dpstring->Disconnect("I am disconnect, motherfucker!");
+		_dpmessanger->Disconnect("I am disconnect, motherfucker!");
 
 		if (newConsole)
 			system("pause");
@@ -104,8 +108,8 @@ TestRegistrationClient ClientTest5() {
 	TestRegistrationClient registration;
 	registration.enabled = true;
 	registration.name = L"Test5";
-	registration.title = L"DPString server - async, client - sync";
-	registration.description = L"Description: Testing scenario when DPString server in async mode and client in sync mode";
+	registration.title = L"DPMessanger server - async, client - sync";
+	registration.description = L"Description: Testing scenario when DPMessanger server in async mode and client in sync mode";
 	registration.createHandler = [registration]() { return new ClientTest5Class(registration); };
 	return registration;
 }

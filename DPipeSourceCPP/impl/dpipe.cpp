@@ -6,51 +6,51 @@ using namespace crdk::dpipes;
 
 //DPipeBuilder implementation
 #pragma region DPipeBuilder
-	IDPipe* DPipeBuilder::Create(const DPIPE_TYPE type, DWORD inBufferSize, DWORD outBufferSize) {
+	IDPipe* DPipeBuilder::Create(const DP_TYPE type, DWORD inBufferSize, DWORD outBufferSize) {
 		switch (type) {
-		case DPIPE_TYPE::ANONYMOUS_PIPE:
+		case DP_TYPE::ANONYMOUS_PIPE:
 			return new DPipeAnonymous(inBufferSize, outBufferSize);
 
-		case DPIPE_TYPE::NAMED_PIPE:
+		case DP_TYPE::NAMED_PIPE:
 			return new DPipeNamed(inBufferSize, outBufferSize);
 		default:
 			return nullptr;
 		}
 	}
 
-	IDPipe* DPipeBuilder::Create(const DPIPE_TYPE type, const std::wstring name)
+	IDPipe* DPipeBuilder::Create(const DP_TYPE type, const std::wstring name)
 	{
 		switch(type) {
-		case DPIPE_TYPE::ANONYMOUS_PIPE:
+		case DP_TYPE::ANONYMOUS_PIPE:
 			return new DPipeAnonymous(name);
 
-		case DPIPE_TYPE::NAMED_PIPE:
+		case DP_TYPE::NAMED_PIPE:
 			return DPipeNamed::Create(name);
 		default:
 			return nullptr;
 		}
 	}
 
-	IDPipe* DPipeBuilder::Create(const DPIPE_TYPE type, std::wstring name, DWORD inBufferSize, DWORD outBufferSize)
+	IDPipe* DPipeBuilder::Create(const DP_TYPE type, std::wstring name, DWORD inBufferSize, DWORD outBufferSize)
 	{
 		switch (type) {
-		case DPIPE_TYPE::ANONYMOUS_PIPE:
+		case DP_TYPE::ANONYMOUS_PIPE:
 			return new DPipeAnonymous(name, inBufferSize, outBufferSize);
 
-		case DPIPE_TYPE::NAMED_PIPE:
+		case DP_TYPE::NAMED_PIPE:
 			return DPipeNamed::Create(name, inBufferSize, outBufferSize);
 		default:
 			return nullptr;
 		}
 	}
 
-	IDPipe* DPipeBuilder::Create(const DPIPE_TYPE type)
+	IDPipe* DPipeBuilder::Create(const DP_TYPE type)
 	{
 		switch (type) {
-		case DPIPE_TYPE::ANONYMOUS_PIPE:
+		case DP_TYPE::ANONYMOUS_PIPE:
 			return new DPipeAnonymous();
 
-		case DPIPE_TYPE::NAMED_PIPE:
+		case DP_TYPE::NAMED_PIPE:
 			return new DPipeNamed();
 		default:
 			return nullptr;

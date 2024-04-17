@@ -2,105 +2,135 @@
 #include "dpipebase.h"
 #include <stdexcept>
 #include <iostream>
+#include <vector>
 
 using namespace std;
 using namespace crdk::dpipes;
 
-//HeapAllocatedData implementation
-#pragma region HeapAllocatedData
-	HeapAllocatedData::HeapAllocatedData(DWORD size, bool keepAllocatedMemory) {
-
-		if (size > 0)
-			_data = new char[size];
-		_size = size;
-	}
-
-	HeapAllocatedData::~HeapAllocatedData() {
-		if (!keepAllocatedMemory && _data != nullptr)
-			delete[] _data;
-	}
-
-	void* HeapAllocatedData::data() const {
-		return _data;
-	}
-
-	DWORD HeapAllocatedData::size() const {
-		return _size;
-	}
-#pragma endregion HeapAllocatedData
-
 //IDuplexPipeHandle class implementation
 #pragma region IDPipeHandle
-	crdk::dpipes::IDPipeHandle::IDPipeHandle() { }
+	IDPipeHandle::IDPipeHandle() { }
 #pragma endregion IDPipeHandle
 
 //IDuplexPipeHandle class implementation
 #pragma region IDPipeHandle
-	crdk::dpipes::IDPipeHandle::~IDPipeHandle() {}
+	IDPipeHandle::~IDPipeHandle() {}
 #pragma endregion IDPipeHandle
 
 //IDuplexPipe base class implementation
 #pragma region IDPipe
-	crdk::dpipes::IDPipe::IDPipe(const std::wstring& sName, DWORD nInBufferSize, DWORD nOutBufferSize) :
+	IDPipe::IDPipe(const std::wstring& sName, 
+		DWORD mtu,
+		DWORD nInBufferSize,
+		DWORD nOutBufferSize) :
+		_mtu(mtu),
 		_sName(sName),
 		_nInBufferSize(nInBufferSize),
 		_nOutBufferSize(nOutBufferSize) { 
 		_skipBuffer = new char[_skipBufferSize];
 	}
 
-	crdk::dpipes::IDPipe::~IDPipe() { }
+	IDPipe::~IDPipe() { 
+		if (_mode != DP_MODE::UNSTARTED)
+			Disconnect();
+	}
 
-	std::wstring crdk::dpipes::IDPipe::GetName() const {
+	std::wstring IDPipe::GetName() const {
 		return _sName; 
 	}
 
-	DWORD crdk::dpipes::IDPipe::BytesToRead() const {
+	DWORD IDPipe::BytesToRead() const {
 		return _nBytesToRead;
 	}
 
-	DWORD crdk::dpipes::IDPipe::GetLastErrorDP() const {
+	DWORD IDPipe::GetLastErrorDP() const {
 		return _nLastError;
 	}
 
-	void crdk::dpipes::IDPipe::Disconnect(LPCVOID pConnectData, DWORD nConnectDataSize) {
+	void IDPipe::Disconnect(LPCVOID pDisconnectData, DWORD nDisconnectDataSize, DWORD prefix) {
 
-		if (_mode == DPIPE_MODE::UNSTARTED)
+		if (_mode == DP_MODE::UNSTARTED)
 			return;
 
+		if (_mode == DP_MODE::INNITIATOR && !_bIsAlive) {
+			_onPingReceivedCallBack = nullptr;
+			_onPongReceivedCallBack = nullptr;
+			_onOtherSideConnectCallBack = nullptr;
+			_onOtherSideDisconnectCallBack = nullptr;
+			_onPacketHeaderReceivedCallBack = nullptr;
+
+			_clientEmulating = true;
+
+			auto handle = GetHandle();
+			auto virtualClient = CreateNewInstance();
+			virtualClient->_clientEmulating = true;
+			virtualClient->Connect(handle.get());
+			virtualClient->Disconnect();
+			while (virtualClient->Mode() != DP_MODE::UNSTARTED) {
+				Sleep(1);
+			}
+			delete virtualClient;
+			return;
+		}
+
 		if ((!_bOtherSideDisconnecting && _bIsAlive)) {
-			_packetPuilder.PrepareServiceHeader(SERVICE_CODE_DISCONNECT, nConnectDataSize);
+			PacketHeader header(true, nDisconnectDataSize);
+			header.SetServiceCode(DP_SERVICE_CODE_DISCONNECT);
+			header.SetServicePrefix(prefix);
+
+			_packetPuilder.PrepareHeader(header);
 			_packetPuilder.WriteHeader(_hWritePipe);
 
-			if (nConnectDataSize) {
+			if (nDisconnectDataSize) {
 				DWORD nBytesWritten;
-				WriteRaw(pConnectData, nConnectDataSize, &nBytesWritten);
+				WriteRaw(pDisconnectData, nDisconnectDataSize, &nBytesWritten);
 			}
 		}
 
-		if (_tReadThread != nullptr) {
+		if (_tReadThread != nullptr && _bIsAlive) {
 			WaitForSingleObject(_tReadThread, INFINITE);
 			CloseHandle(_tReadThread);
 			_tReadThread = nullptr;
 		}
+		else {
+			DisconnectPipe(_bIsAlive);
+		}
+
+		_mode = DP_MODE::UNSTARTED;
 	}
 
-	void crdk::dpipes::IDPipe::Disconnect() {
+	void IDPipe::Disconnect() {
 		Disconnect(nullptr, 0);
 	}
 
-	void crdk::dpipes::IDPipe::SetClientConnectCallback(std::function<void(PacketHeader)> function) {
-		_onClientConnectCallBack = function;
+	void crdk::dpipes::IDPipe::SetPingReceivedCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function) {
+		_onPingReceivedCallBack = function;
 	}
 
-	void crdk::dpipes::IDPipe::SetOtherSideDisconnectCallback(std::function<void(PacketHeader)> function) {
-		_onPartnerDisconnectCallBack = function;
+	void crdk::dpipes::IDPipe::SetPongReceivedCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function) {
+		_onPongReceivedCallBack = function;
 	}
 
-	void crdk::dpipes::IDPipe::SetPacketHeaderRecevicedCallback(std::function<void(PacketHeader)> function){
+	void IDPipe::SetClientConnectCallback(std::function<void(IDPipe* sender, PacketHeader header)> function) {
+		_onOtherSideConnectCallBack = function;
+	}
+
+	void IDPipe::SetOtherSideDisconnectCallback(std::function<void(IDPipe* sender, PacketHeader header)> function) {
+		_onOtherSideDisconnectCallBack = function;
+	}
+
+	void IDPipe::SetPacketHeaderRecevicedCallback(std::function<void(IDPipe* sender, PacketHeader header)> function){
 		_onPacketHeaderReceivedCallBack = function;
 	}
 
-	void crdk::dpipes::IDPipe::Skip(DWORD nBytesToSkip) {
+	void crdk::dpipes::IDPipe::SetConfigurationRecevicedCallback(std::function<void(IDPipe* sender, PacketHeader ph)> function) {
+		_onConfigurationReceivedCallBack = function;
+	}
+
+	void IDPipe::Skip(DWORD nBytesToSkip) {
+
+		if (nBytesToSkip == 0)
+			return;
 
 		if (nBytesToSkip > _nBytesToRead)
 			throw exception("Unable to skip more bytes then specified in PacketHeader");
@@ -119,37 +149,43 @@ using namespace crdk::dpipes;
 		}
 	}
 
-	void crdk::dpipes::IDPipe::Skip(PacketHeader header) {
+	void IDPipe::Skip(PacketHeader header) {
 		Skip(header.DataSize());
 	}
 
-	HANDLE crdk::dpipes::IDPipe::ReadHandle()
-	{
+	HANDLE IDPipe::ReadHandle() {
 		return _hReadPipe;
 	}
 
-	HANDLE crdk::dpipes::IDPipe::WriteHandle()
-	{
+	HANDLE IDPipe::WriteHandle() {
 		return _hWritePipe;
 	}
 
-	void crdk::dpipes::IDPipe::OnClientConnect(PacketHeader ph) {
+	void IDPipe::OnClientConnect(PacketHeader ph) {
 		OnPipeClientConnect();
 
 		_bIsAlive = true;
 
-		if (_onClientConnectCallBack)
-			_onClientConnectCallBack(ph);
+		if (_onOtherSideConnectCallBack) {
+			_onOtherSideConnectCallBack(this, ph);
+
+			if (_nBytesToRead > 0)
+				Skip(_nBytesToRead);
+		}
 		else {
 			if (ph.DataSize() > 0)
 				Skip(ph);
 		}
 	}
 
-	void crdk::dpipes::IDPipe::OnOtherSideDisconnect(PacketHeader ph) {
+	void IDPipe::OnOtherSideDisconnect(PacketHeader ph) {
 
-		if (_onPartnerDisconnectCallBack)
-			_onPartnerDisconnectCallBack(ph);
+		if (_onOtherSideDisconnectCallBack) {
+			_onOtherSideDisconnectCallBack(this, ph);
+
+			if (_nBytesToRead > 0)
+				Skip(_nBytesToRead);
+		}
 		else {
 			if (ph.DataSize() > 0)
 				Skip(ph);
@@ -158,57 +194,198 @@ using namespace crdk::dpipes;
 		_bOtherSideDisconnecting = true;
 	}
 
-	void crdk::dpipes::IDPipe::OnOtherSideDisconnectPipe() {
+	void IDPipe::OnOtherSideDisconnectPipe() {
 		_bIsAlive = false;
 		_bListening = false;
 
-		DisconnectPipe();
-
-#ifdef _DEBUG
-		//string mode;
-		//if (_mode == DPIPE_MODE::CLIENT)
-		//	mode = "CLIENT";
-		//else
-		//	mode = "INNICIATOR";
-
-		//string type;
-		//if (_type == DPIPE_TYPE::ANONYMOUS_PIPE)
-		//	type = "ANONYMOUS";
-		//else
-		//	type = "NAMED";
-
-		//cout << mode << " " << type << " Disconnected" << endl;
-
-		//_mode = DPIPE_MODE::UNSTARTED;
-#endif //_DEBUG
+		DisconnectPipe(_bIsAlive);
+		_mode = DP_MODE::UNSTARTED;
 	}
 
-	void crdk::dpipes::IDPipe::OnTerminating() { }
+	void IDPipe::OnTerminating(PacketHeader ph) { }
 
-	void crdk::dpipes::IDPipe::OnPacketHeaderReceived(PacketHeader ph) {
-		if (_onPacketHeaderReceivedCallBack)
-			_onPacketHeaderReceivedCallBack(ph);
+	void IDPipe::OnPacketHeaderReceived(PacketHeader ph) {
+		if (_onPacketHeaderReceivedCallBack) {
+			_onPacketHeaderReceivedCallBack(this, ph);
+
+			if (_nBytesToRead > 0)
+				Skip(_nBytesToRead);
+		}
+
 		else {
-			if (ph.DataSize() > 0)
-				Skip(ph);
+			Skip(ph);
 		}
 	}
 
-	void crdk::dpipes::IDPipe::ServicePacketReceived(PacketHeader ph){
+	void IDPipe::OnPingReceived(PacketHeader ph) {
 
-		unsigned int command = PacketBuilder::GetCommand(ph.GetServiceCode());
+		SendPong(_hWritePipe);
+
+		if (_onPingReceivedCallBack) {
+			_onPingReceivedCallBack(this, ph);
+
+			if (_nBytesToRead > 0)
+				Skip(_nBytesToRead);
+		}
+
+		else
+			Skip(ph);
+	}
+
+	void IDPipe::OnPongReceived(PacketHeader ph) {
+
+		if (_onPongReceivedCallBack) {
+			_onPongReceivedCallBack(this, ph);
+
+			if (_nBytesToRead > 0)
+				Skip(_nBytesToRead);
+		}
+
+		else
+			Skip(ph);
+	}
+
+	void IDPipe::OnMtuRequest(PacketHeader ph) {
+		DWORD mtu;
+		DWORD nBytesRead;
+		Read(&mtu, 4, &nBytesRead, NULL);
+
+		if (mtu < _mtu)
+			_mtu = mtu;
+
+		SendMtuResponse(_hWritePipe, _mtu);
+	}
+
+	void IDPipe::OnMtuResponse(PacketHeader ph) {
+		DWORD mtu = 0;
+		DWORD nBytesRead;
+		Read(&mtu, 4, &nBytesRead, NULL);
+
+		if (mtu < _mtu)
+			_mtu = mtu;
+	}
+
+	void IDPipe::OnConfigurationReceived(PacketHeader ph) {
+		if (_onConfigurationReceivedCallBack) {
+			_onConfigurationReceivedCallBack(this, ph);
+
+			if (_nBytesToRead > 0)
+				Skip(_nBytesToRead);
+		}
+
+		else
+			Skip(ph);
+	}
+
+	void IDPipe::SendConfiguration(LPVOID lpBuffer, DWORD nBytesCount) {
+		Write(DP_SERVICE_CODE_SEND_CONFIGURATION, lpBuffer, nBytesCount);
+	}
+
+	void IDPipe::SendMtuRequest(HANDLE& hWriteHandle, DWORD mtu) {
+		PacketHeader header(true, 4);
+		header.SetServiceCode(DP_SERVICE_CODE_MTU_REQUEST);
+		_packetPuilder.PrepareHeader(header);
+		_packetPuilder.WriteHeader(hWriteHandle);
+		DWORD nBytesWrittten;
+		WriteRaw(hWriteHandle, &mtu, 4, &nBytesWrittten);
+	}
+
+	void IDPipe::SendMtuResponse(HANDLE& hWriteHandle, DWORD mtu) {
+		PacketHeader header(true, 4);
+		header.SetServiceCode(DP_SERVICE_CODE_MTU_RESPONSE);
+		_packetPuilder.PrepareHeader(header);
+		_packetPuilder.WriteHeader(hWriteHandle);
+		DWORD nBytesWrittten;
+		WriteRaw(hWriteHandle, &mtu, 4, &nBytesWrittten);
+	}
+
+	void IDPipe::ServicePacketReceived(PacketHeader header) {
+
+		unsigned int command = header.GetServiceCode();
 
 		switch (command) {
-		case SERVICE_CODE_CONNECT:
-			OnClientConnect(ph);
+		case DP_SERVICE_CODE_CONNECT:
+			OnClientConnect(header);
 			break;
-		case SERVICE_CODE_DISCONNECT:
-			OnOtherSideDisconnect(ph);
+		case DP_SERVICE_CODE_DISCONNECT:
+			OnOtherSideDisconnect(header);
 			break;
-		case SERVICE_CODE_TERMINATING:
-			OnTerminating();
+		case DP_SERVICE_CODE_TERMINATING:
+			OnTerminating(header);
+			break;
+		case DP_SERVICE_CODE_PING:
+			OnPingReceived(header);
+			break;
+		case DP_SERVICE_CODE_PONG:
+			OnPongReceived(header);
+			break;
+		case DP_SERVICE_CODE_MTU_REQUEST:
+			OnMtuRequest(header);
+			break;
+		case DP_SERVICE_CODE_MTU_RESPONSE:
+			OnMtuResponse(header);
+			break;
+		case DP_SERVICE_CODE_SEND_CONFIGURATION:
+			OnConfigurationReceived(header);
 			break;
 		}
 	}
 
 #pragma endregion IDPipe
+
+	bool IDPipe::SendPing(HANDLE& hWriteHandle) {
+		PacketHeader header(true, 0);
+		header.SetServiceCode(DP_SERVICE_CODE_PING);
+		_packetPuilder.PrepareHeader(header);
+		return _packetPuilder.WriteHeader(hWriteHandle);
+	}
+
+	bool IDPipe::SendPong(HANDLE& hWriteHandle) {
+		PacketHeader header(true, 0);
+		header.SetServiceCode(DP_SERVICE_CODE_PONG);
+		_packetPuilder.PrepareHeader(header);
+		return _packetPuilder.WriteHeader(hWriteHandle);
+	}
+
+	void IDPipe::ReadFrom(IDPipe* source, DWORD nNumberOfBytesToRead, DWORD nBufferSize) {
+
+		vector<char> buffer(nBufferSize);
+
+		auto cyclecs = nNumberOfBytesToRead / nBufferSize;
+		auto rest = nNumberOfBytesToRead % nBufferSize;
+
+		for (DWORD i = 0; i < cyclecs; i++)
+		{
+			source->Read(buffer.data(), nBufferSize);
+			Write(buffer.data(), nBufferSize);
+		}
+
+		source->Read(buffer.data(), rest);
+		Write(buffer.data(), rest);
+	}
+
+	void crdk::dpipes::IDPipe::CopyTo(IDPipe* dest, DWORD nNumberOfBytes, DWORD nBufferSize) {
+
+		vector<char> buffer(nBufferSize);
+
+		auto cyclecs = nNumberOfBytes / nBufferSize;
+		auto rest = nNumberOfBytes % nBufferSize;
+
+		for (DWORD i = 0; i < cyclecs; i++)
+		{
+			Read(buffer.data(), nBufferSize);
+			dest->Write(buffer.data(), nBufferSize);
+		}
+
+		Read(buffer.data(), rest);
+		dest->Write(buffer.data(), rest);
+	}
+
+	MemoryDataCallback::MemoryDataCallback(
+		void* dataAddress, 
+		DWORD dataSize, 
+		std::function<void(void* address, DWORD size)> callbackFunction) {
+		address = dataAddress;
+		size = dataSize;
+		callback = callbackFunction;
+	}

@@ -6,25 +6,25 @@ using System.Threading;
 
 namespace CreatorDK.IO.DPipes
 {
-    public class DPipeNamed : DPipe
+    public class DPNamed : DPipe
     {
-        public DPipeNamed(string name = DPipeNamedHandle.DefaultPipeName, 
-            int inBufferSize = (int)Constants.PIPE_BUFFERLENGTH_DEFAULT, 
-            int outBufferSize = (int)Constants.PIPE_BUFFERLENGTH_DEFAULT) : 
-                base(name, inBufferSize, outBufferSize) { }
+        public DPNamed(string name = DPNamedHandle.DefaultPipeName, 
+            int inBufferSize = (int)Constants.DP_BUFFER_SIZE_DEFAULT, 
+            int outBufferSize = (int)Constants.DP_BUFFER_SIZE_DEFAULT) : 
+                base(name, 65536, inBufferSize, outBufferSize) { }
 
-        public DPipeNamed(
+        public DPNamed(
             int inBufferSize,
             int outBufferSize) :
-                base(DPipeNamedHandle.DefaultPipeName, inBufferSize, outBufferSize)
+                base(DPNamedHandle.DefaultPipeName, 65536, inBufferSize, outBufferSize)
         { }
 
-        public static DPipeNamed Create(string pipeNameFull, int inBufferSize = (int)Constants.PIPE_BUFFERLENGTH_DEFAULT, int outBufferSize = (int)Constants.PIPE_BUFFERLENGTH_DEFAULT)
+        public static DPNamed Create(string pipeNameFull, int inBufferSize = (int)Constants.DP_BUFFER_SIZE_DEFAULT, int outBufferSize = (int)Constants.DP_BUFFER_SIZE_DEFAULT)
         {
-            if (DPipeNamedHandle.IsNamed(pipeNameFull))
+            if (DPNamedHandle.IsNamed(pipeNameFull))
             {
-                string pipeName = DPipeNamedHandle.GetNamedPipeNamePart(pipeNameFull);
-                return new DPipeNamed(pipeName, inBufferSize, outBufferSize);
+                string pipeName = DPNamedHandle.GetNamedPipeNamePart(pipeNameFull);
+                return new DPNamed(pipeName, inBufferSize, outBufferSize);
             }
                 
             else
@@ -33,7 +33,7 @@ namespace CreatorDK.IO.DPipes
 
         private TokenImpersonationLevel TokenImpersonationLevel { get; set; } = TokenImpersonationLevel.Impersonation;
 
-        public override DPIPE_TYPE Type => DPIPE_TYPE.NAMED_PIPE;
+        public override DP_TYPE Type => DP_TYPE.NAMED_PIPE;
 
         public int MaxInstances { get; set; } = 1;
 
@@ -48,7 +48,7 @@ namespace CreatorDK.IO.DPipes
 
             bool disconnection = false;
 
-            if (_mode == DPIPE_MODE.INNITIATOR)
+            if (_mode == DP_MODE.INNITIATOR)
             {
                 var _readNamedPipeServerStream = (NamedPipeServerStream)_readPipeStream;
                 var _writeNamedPipeServerStream = (NamedPipeServerStream)_writePipeStream;
@@ -66,22 +66,24 @@ namespace CreatorDK.IO.DPipes
                 }
                     
                 PacketHeader header = _packetPuilder.GetPacketHeader(_readPipeStream, this);
+                _bytesRead = 0;
                 _bytesToRead = header.DataSize;
-                var command = PacketBuilder.GetCommand(header.ServiceCode);
 
-                if (header.IsService())
+                if (header.IsService)
                 {
+                    var command = header.ServiceCode;
+
                     ServicePacketReceived(header);
 
-                    if (command == Constants.SERVICE_CODE_DISCONNECTED)
+                    if (command == Constants.DP_SERVICE_CODE_DISCONNECTED)
                     {
                         disconnection = true;
                         break;
                     }
 
-                    else if (command == Constants.SERVICE_CODE_DISCONNECT)
+                    else if (command == Constants.DP_SERVICE_CODE_DISCONNECT)
                     {
-                        _packetPuilder.PrepareServiceHeader(Constants.SERVICE_CODE_DISCONNECTED);
+                        _packetPuilder.PrepareServiceHeader(Constants.DP_SERVICE_CODE_DISCONNECTED);
                         _packetPuilder.WriteHeader(_writePipeStream);
                         disconnection = true;
                         break;
@@ -96,25 +98,25 @@ namespace CreatorDK.IO.DPipes
         }
         public void Start(SafePipeHandle readPipeSafePipeHandle, SafePipeHandle writePipeSafePipeHandle) 
         {
-            if (_mode == DPIPE_MODE.INNITIATOR)
+            if (_mode == DP_MODE.INNITIATOR)
                 throw new Exception("Pipe already created");
-            else if (_mode == DPIPE_MODE.CLIENT)
+            else if (_mode == DP_MODE.CLIENT)
                 throw new Exception("Cannot create pipe in client mode");
 
             _readPipeStream = new NamedPipeServerStream(PipeDirection.In, false, false, readPipeSafePipeHandle);
             _writePipeStream = new NamedPipeServerStream(PipeDirection.Out, false, false, writePipeSafePipeHandle);
 
             _listening = true;
-            _mode = DPIPE_MODE.INNITIATOR;
+            _mode = DP_MODE.INNITIATOR;
 
             _readThread = new Thread(ReadLoop);
             _readThread.Start();
         }
         public void Start(int maxNumberOfServerInstance, PipeOptions pipeOptions = PipeOptions.None)
         {
-            if (_mode == DPIPE_MODE.INNITIATOR)
+            if (_mode == DP_MODE.INNITIATOR)
                 throw new Exception("Pipe already created");
-            else if (_mode == DPIPE_MODE.CLIENT)
+            else if (_mode == DP_MODE.CLIENT)
                 throw new Exception("Cannot create pipe in client mode");
 
             string pipeNameRead = $"{_name}_read";
@@ -140,7 +142,7 @@ namespace CreatorDK.IO.DPipes
                 );
 
             _listening = true;
-            _mode = DPIPE_MODE.INNITIATOR;
+            _mode = DP_MODE.INNITIATOR;
 
             _readThread = new Thread(ReadLoop);
             _readThread.Start();
@@ -152,10 +154,10 @@ namespace CreatorDK.IO.DPipes
 
         public void SetAccessControl(PipeSecurity pipeSecurity)
         {
-            if (_mode == DPIPE_MODE.CLIENT)
+            if (_mode == DP_MODE.CLIENT)
                 throw new Exception("Cannot set Pipe Security properties in client mode");
 
-            if (_mode == DPIPE_MODE.UNSTARTED)
+            if (_mode == DP_MODE.UNSTARTED)
                 throw new Exception("Cannot set Pipe Security properties in unstarted mode");
 
             if (_readPipeStream == null)
@@ -166,18 +168,18 @@ namespace CreatorDK.IO.DPipes
         }
         public override IDPipeHandle GetHandle()
         {
-            if (_mode == DPIPE_MODE.UNSTARTED)
+            if (_mode == DP_MODE.UNSTARTED)
                 throw new Exception("Unable to get handle of unstarded dpipe");
 
-            if (_mode == DPIPE_MODE.CLIENT)
+            if (_mode == DP_MODE.CLIENT)
                 throw new Exception("Unable to get handle in client mode");
 
-            if (_mode == DPIPE_MODE.INNICIATOR_CLIENT ||  _mode == DPIPE_MODE.INNITIATOR)
+            if (_mode == DP_MODE.INNICIATOR_CLIENT ||  _mode == DP_MODE.INNITIATOR)
             {
                 if (UseRemote)
-                    return new DPipeNamedHandle(Environment.MachineName, _name);
+                    return new DPNamedHandle(Environment.MachineName, _name);
                 else
-                    return new DPipeNamedHandle(".", _name);
+                    return new DPNamedHandle(".", _name);
             }
                
             else
@@ -187,9 +189,9 @@ namespace CreatorDK.IO.DPipes
         {
             return GetHandle().AsString();
         }
-        public void Connect(DPipeNamedHandle pipeHandle, byte[] connectData = null)
+        public void ConnectNamed(DPNamedHandle pipeHandle, byte[] connectData = null, uint prefix = 0)
         {
-            if (_mode == DPIPE_MODE.CLIENT || _mode == DPIPE_MODE.INNITIATOR)
+            if (_mode == DP_MODE.CLIENT || _mode == DP_MODE.INNITIATOR)
                 return;
 
             if (pipeHandle == null)
@@ -219,11 +221,19 @@ namespace CreatorDK.IO.DPipes
             _readPipeStream = readNamedPipeClientStream;
             _writePipeStream = writeNamedPipeClientStream;
 
-            //readNamedPipeClientStream.Connect();
             writeNamedPipeClientStream.Connect();
             readNamedPipeClientStream.Connect();
 
-            _mode = DPIPE_MODE.CLIENT;
+            SendMtuRequest(_writePipeStream, _mtu);
+
+            var mtuHeader = _packetPuilder.GetPacketHeader(_readPipeStream, this);
+            if (mtuHeader.ServiceCode != Constants.DP_SERVICE_CODE_MTU_RESPONSE)
+                throw new Exception("Unable to get mtu size");
+
+            _bytesToRead = 4;
+            OnMtuResponseReceived(mtuHeader);
+
+            _mode = DP_MODE.CLIENT;
             _listening = true;
             _isAlive = true;
 
@@ -232,35 +242,39 @@ namespace CreatorDK.IO.DPipes
 
             int connectDataSize = connectData == null ? 0 : connectData.Length;
 
-            _packetPuilder.PrepareServiceHeader(Constants.SERVICE_CODE_CONNECT, connectDataSize);
+            PacketHeader header = new PacketHeader(true, connectDataSize);
+            header.ServiceCode = Constants.DP_SERVICE_CODE_CONNECT;
+            header.ServicePrefix = prefix;
+
+            _packetPuilder.PrepareHeader(header);
             _packetPuilder.WriteHeader(_writePipeStream);
 
             if (connectData != null && connectDataSize > 0)
                 WriteRaw(connectData, 0, connectDataSize);
         }
-        public override void Connect(IDPipeHandle pipeHandle, byte[] connectData)
+        public override void Connect(IDPipeHandle pipeHandle, byte[] connectData, uint prefix = 0)
         {
-            if (_mode == DPIPE_MODE.CLIENT || _mode == DPIPE_MODE.INNITIATOR)
+            if (_mode == DP_MODE.CLIENT || _mode == DP_MODE.INNITIATOR)
                 return;
 
             if (pipeHandle == null)
                 throw new ArgumentException("Handle is null");
 
-            DPipeNamedHandle namedHandle = (DPipeNamedHandle)pipeHandle;
-            Connect(namedHandle, connectData);
+            DPNamedHandle namedHandle = (DPNamedHandle)pipeHandle;
+            ConnectNamed(namedHandle, connectData, prefix);
         }
         public override void Connect(IDPipeHandle pipeHandle)
         {
             Connect(pipeHandle, null);
         }
-        public override void Connect(string handleString, byte[] data)
+        public override void Connect(string handleString, byte[] data, uint prefix = 0)
         {
-            var namedHandle = DPipeNamedHandle.Create(handleString);
-            Connect(namedHandle, data);
+            var namedHandle = DPNamedHandle.Create(handleString);
+            ConnectNamed(namedHandle, data, prefix);
         }
         public override void Connect(string handleString)
         {
-            var namedHandle = DPipeNamedHandle.Create(handleString);
+            var namedHandle = DPNamedHandle.Create(handleString);
             Connect(namedHandle, null);
         }
         public override int Read(byte[] buffer, int offset, int count)
@@ -268,42 +282,52 @@ namespace CreatorDK.IO.DPipes
             if (_readPipeStream == null)
                 return 0;
 
-            int cycles = count / 65536;
-            int restBytes = count % 65536;
+            int bytesReadTotal = 0;
 
-            _bytesRead = 0;
+            int mtu = _mtu > int.MaxValue ? int.MaxValue : (int)_mtu;
 
-            for (int i = 0; i < cycles; i++)
+            while (count != bytesReadTotal)
             {
-                _bytesRead += _readPipeStream.Read(buffer, 65536 * i + offset, 65536);
+                int bytesToRead;
+                if (count - bytesReadTotal > mtu)
+                    bytesToRead = mtu;
+                else
+                    bytesToRead = count - bytesReadTotal;
+
+                int bytesRead = _readPipeStream.Read(buffer, offset + bytesReadTotal, bytesToRead);
+                bytesReadTotal += bytesRead;
+                _bytesRead += bytesRead;
+                _bytesToRead -= bytesRead;
             }
 
-            if (restBytes > 0)
-            {
-                _bytesRead += _readPipeStream.Read(buffer, cycles * 65536 + offset, restBytes);
-            }
-
-            _bytesToRead -= _bytesRead;
-
-            return _bytesRead;
+            return bytesReadTotal;
         }
-        public override void WriteRaw(byte[] buffer, int offset, int count)
+
+        public override void WriteRaw(PipeStream pipeStream, byte[] buffer, int offset, int count)
         {
-            if (_writePipeStream == null)
+            if (pipeStream == null)
                 return;
 
-            int cycles = count / 65536;
-            int restBytes = count % 65536;
+            int bytesWrittenTotal = 0;
 
-            for (int i = 0; i < cycles; i++)
-            {
-                _writePipeStream.Write(buffer, 65536 * i + offset, 65536);
-            }
+            int mtu = _mtu > int.MaxValue ? int.MaxValue : (int)_mtu;
 
-            if (restBytes > 0)
+            while (count != bytesWrittenTotal)
             {
-                _writePipeStream.Write(buffer, cycles * 65536 + offset, restBytes);
+                int bytesToWrite;
+                if (count - bytesWrittenTotal > mtu)
+                    bytesToWrite = mtu;
+                else
+                    bytesToWrite = count - bytesWrittenTotal;
+
+                _writePipeStream.Write(buffer, offset + bytesWrittenTotal, bytesToWrite);
+                bytesWrittenTotal += bytesToWrite;
             }
+        }
+
+        public override void WriteRaw(byte[] buffer, int offset, int count)
+        {
+            WriteRaw(_writePipeStream, buffer, offset, count);
         }
         public override void Write(uint serviceCode, byte[] buffer, int offset, int count)
         {
@@ -316,14 +340,14 @@ namespace CreatorDK.IO.DPipes
         }
         public override void Write(byte[] buffer, int offset, int count)
         {
-            Write(Constants.SERVICE_CODE_RAW_CLIENT, buffer, offset, count);
+            Write(Constants.DP_SERVICE_CODE_RAW_CLIENT, buffer, offset, count);
         }
         public override void WritePacketHeader(PacketHeader header)
         {
             if (_writePipeStream == null)
                 return;
 
-            _packetPuilder.PrepareClientHeader(header.ServiceCode, header.DataSize);
+            _packetPuilder.PrepareClientHeader(header.Code, header.DataSize);
             _packetPuilder.WriteHeader(_writePipeStream);
         }
         protected override void OnPipeClientConnect()
@@ -338,6 +362,11 @@ namespace CreatorDK.IO.DPipes
         {
             _readPipeStream?.Dispose();
             _writePipeStream?.Dispose();
+        }
+
+        public override DPipe CreateNewInstance()
+        {
+            return new DPNamed(_name, _inBufferSize, _outBufferSize);
         }
     }
 }

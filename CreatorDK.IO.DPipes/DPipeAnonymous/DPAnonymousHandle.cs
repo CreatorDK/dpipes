@@ -5,7 +5,7 @@ using System.Text.RegularExpressions;
 
 namespace CreatorDK.IO.DPipes
 {
-    public partial class DPipeAnonymousHandle : IDPipeHandle
+    public partial class DPAnonymousHandle : IDPipeHandle
     {
         private readonly string _readHandle;
         private readonly string _writeHandle;
@@ -20,13 +20,13 @@ namespace CreatorDK.IO.DPipes
 
         public const string DefaultPipeName = "Anonymus";
 
-        public DPipeAnonymousHandle(int readHandle, int writeHandle)
+        public DPAnonymousHandle(int readHandle, int writeHandle)
         {
             _readHandle = readHandle.ToString();
             _writeHandle = writeHandle.ToString();
         }
 
-        private DPipeAnonymousHandle(string handleString)
+        private DPAnonymousHandle(string handleString)
         {
             string readHandleString = handleString.Substring(0, 16);
             string writeHandleString = handleString.Substring(19, 16);
@@ -38,21 +38,21 @@ namespace CreatorDK.IO.DPipes
             _writeHandle = writeHandleInteger.ToString();
         }
 
-        public static DPipeAnonymousHandle Create(string handleString)
+        public static DPAnonymousHandle Create(string handleString)
         {
             if (IsAnonymus(handleString))
-                return new DPipeAnonymousHandle(handleString);
+                return new DPAnonymousHandle(handleString);
             else
                 throw new ArgumentException("Invalid DPipeAnonymus handle string");
         }
 
-        public DPipeAnonymousHandle(string readHandleString, string writeHandleString)
+        public DPAnonymousHandle(string readHandleString, string writeHandleString)
         {
             _readHandle = readHandleString;
             _writeHandle = writeHandleString;
         }
 
-        public static DPipeAnonymousHandle Create(string readHandleString, string writeHandleString)
+        public static DPAnonymousHandle Create(string readHandleString, string writeHandleString)
         {
             bool readHandleCorrect = int.TryParse(readHandleString, NumberStyles.HexNumber, CultureInfo.InvariantCulture, out _);
 
@@ -64,7 +64,7 @@ namespace CreatorDK.IO.DPipes
             if (!writeHandleCorrect)
                 throw new ArgumentException("Invalid DPipeAnonymus Write Handle");
 
-            return new DPipeAnonymousHandle(readHandleString, writeHandleString);
+            return new DPAnonymousHandle(readHandleString, writeHandleString);
         }
 
         public string AsString()
@@ -77,9 +77,9 @@ namespace CreatorDK.IO.DPipes
             return $"{readHandleString}:::{writeHandleString}";
         }
 
-        DPIPE_TYPE IDPipeHandle.GetType()
+        DP_TYPE IDPipeHandle.GetType()
         {
-            return DPIPE_TYPE.ANONYMUS_PIPE;
+            return DP_TYPE.ANONYMOUS_PIPE;
         }
 
         public static Regex AnonymusHandleRegex()

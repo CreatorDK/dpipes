@@ -7,10 +7,25 @@ typedef std::chrono::high_resolution_clock Time;
 
 //DPResponse implementation
 #pragma region DPResponse
-	DPResponse::DPResponse(int code, int dataType, std::shared_ptr<HeapAllocatedData> data) {
+	DPResponse::DPResponse(
+		int code, 
+		int descriptorType,
+		DWORD descriptorSize,
+		bool descriptorAllocated,
+		std::shared_ptr<HeapAllocatedData> descriptor,
+		int dataType, 
+		DWORD dataSize,
+		std::shared_ptr<HeapAllocatedData> data, 
+		IDPipe* dpipe) {
 		_code = code;
+		_descriptorType = descriptorType;
+		_descriptorSize = descriptorSize;
+		_descriptorAllocated = descriptorAllocated;
+		_descriptor = descriptor;
 		_dataType = dataType;
+		_dataSize = dataSize;
 		_data = data;
+		_dpipe = dpipe;
 	}
 
 	DPResponse::~DPResponse() {
@@ -21,27 +36,59 @@ typedef std::chrono::high_resolution_clock Time;
 		return _code;
 	}
 
+	bool DPResponse::descriptorAllocated() const {
+		return _descriptorAllocated;
+	}
+
+	int crdk::dpipes::DPResponse::descriptorType() const {
+		return _descriptorType;
+	}
+
+	DWORD DPResponse::descriptorSize() const {
+		return _descriptorSize;
+	}
+
+	std::shared_ptr<HeapAllocatedData> crdk::dpipes::DPResponse::descriptor() {
+		return _descriptor;
+	}
+
+	void* DPResponse::descriptorPtr() const {
+		return _descriptor->data();
+	}
+
+	bool DPResponse::dataAllocated() const {
+		return _dataAllocated;
+	}
+
 	int DPResponse::dataType() const {
 		return _dataType;
 	}
 
-	void* DPResponse::data() const {
-		return _data->data();
+	DWORD DPResponse::dataSize() const {
+		return _dataSize;
 	}
 
-	shared_ptr<HeapAllocatedData> DPResponse::getData() {
+	shared_ptr<HeapAllocatedData> DPResponse::data() {
 		return _data;
 	}
 
-	DWORD DPResponse::dataSize() const {
-		return _data->size();
+	void* DPResponse::dataPtr() const {
+		return _data->data();
 	}
 
-	bool DPResponse::keepAllocatedMemory() {
+	bool crdk::dpipes::DPResponse::keepDescriptor() {
+		return _descriptor->keepAllocatedMemory;
+	}
+
+	void crdk::dpipes::DPResponse::keepDescriptor(bool keepAllocatedMemory) {
+		_descriptor->keepAllocatedMemory = keepAllocatedMemory;
+	}
+
+	bool DPResponse::keepData() {
 		return _data->keepAllocatedMemory;
 	}
 
-	void DPResponse::keepAllocatedMemory(bool keepAllocatedMemory) {
+	void DPResponse::keepData(bool keepAllocatedMemory) {
 		_data->keepAllocatedMemory = keepAllocatedMemory;
 	}
 
@@ -56,17 +103,44 @@ typedef std::chrono::high_resolution_clock Time;
 	chrono::duration<float> DPResponse::totalDuraction() const {
 		return _request_duraction + _send_duraction;
 	}
+
+	IDPipe* DPResponse::dpipe() const {
+		return _dpipe;
+	}
+	void DPResponse::ReadDescriptor(bool keepAllocatedMemory) {
+
+		if (!_descriptorAllocated && _descriptorSize > 0) {
+
+			_descriptor.~shared_ptr();
+
+			_descriptor = make_shared<HeapAllocatedData>(_descriptorSize, keepAllocatedMemory);
+			_dpipe->Read(_descriptor->data(), _descriptorSize);
+			_descriptorAllocated = true;
+		}
+
+	}
+	void DPResponse::Read(bool keepAllocatedMemory) {
+
+		ReadDescriptor(keepAllocatedMemory);
+
+		if (!_dataAllocated && _dataSize > 0) {
+
+			_data.~shared_ptr();
+
+			_data = make_shared<HeapAllocatedData>(_dataSize, keepAllocatedMemory);
+			_dpipe->Read(_data->data(), _dataSize);
+			_dataAllocated = true;
+		}
+	}
 #pragma endregion DPResponse
 
 //DPClient implementation
 #pragma region DPClient
-	DPClient::DPClient(IDPipe* dpipe, bool handleAsync, DWORD nBufferStringSize) :
-		IDPipeMessanger(dpipe, nBufferStringSize)
+	DPClient::DPClient(IDPipe* dpipe, bool handleAsync):
+		IDPipeMessanger(dpipe)
 	{
-		if (_dpipe == nullptr)
-			return;
-
-		_handleAsync = handleAsync;
+		_dpipe = dpipe;
+		_handleResponseAsync = handleAsync;
 
 		_nBufferRequestSize = DP_REQUEST_SIZE;
 		_pBufferRequest = new char [DP_REQUEST_SIZE];
@@ -74,89 +148,81 @@ typedef std::chrono::high_resolution_clock Time;
 		_nBufferResponseSize = DP_RESPONSE_SIZE;
 		_pBufferResponse = new char[DP_RESPONSE_SIZE];
 
-		_dpipe->SetOtherSideDisconnectCallback([=](PacketHeader header) { OnServerDisconnecting(header); });
-		_dpipe->SetPacketHeaderRecevicedCallback([=](PacketHeader header) { OnDataReceived(header); });
+		_dpipe->SetOtherSideDisconnectCallback([=](IDPipe* pipe, PacketHeader header) { OnServerDisconnecting(pipe, header); });
+		_dpipe->SetPacketHeaderRecevicedCallback([=](IDPipe* pipe, PacketHeader header) { OnDataReceived(pipe, header); });
 	}
 
 	DPClient::~DPClient()
 	{ 
-		_dpipe->SetOtherSideDisconnectCallback(nullptr);
-		_dpipe->SetPacketHeaderRecevicedCallback(nullptr);
+		_dpipe->SetOtherSideDisconnectCallback({});
+		_dpipe->SetPacketHeaderRecevicedCallback({});
 
 		delete[] _pBufferRequest;
 		delete[] _pBufferResponse;
 	}
 
-	void DPClient::OnServerDisconnecting(PacketHeader header) {
-		DWORD dataSize = header.DataSize();
-		DWORD nBytesRead;
-
-		//_dpipe->Read(_pBufferRequest, DP_REQUEST_SIZE, &nBytesRead, NULL);
-		auto heapData = make_shared<HeapAllocatedData>(dataSize, false);
-
-		if (dataSize > 0) {
-			void* buffer = heapData->data();
-			_dpipe->Read(buffer, dataSize, &nBytesRead, NULL);
-		}
-
+	void DPClient::OnServerDisconnecting(IDPipe* pipe, PacketHeader header) {
 		if (_onServerDisconnect)
-			_onServerDisconnect(heapData);
+			_onServerDisconnect(pipe, header);
 	}
 
-	void DPClient::OnDataReceived(PacketHeader header) {
+	void DPClient::OnDataReceived(IDPipe* pipe, PacketHeader header) {
 
 		DWORD nBytesRead;
-		DWORD serviceCode = header.GetServiceCode();
-		bool isStringData = serviceCode & 0x01;
+
+		//Get data code ignoring first 8 bits (using for encoding)
+		DWORD dataCode = header.GetDataCodeOnly();
+
+		if (dataCode == DP_RESPONSE) {
+			OnResponseReceived(header);
+			return;
+		}
+
+		bool isStringData = dataCode & 0x01;
 
 		//If data is string
 		if (isStringData) {
 
-			if (_handleAsync) {
-				auto messangerPtr = dynamic_cast<IDPipeMessanger*>(this);
-				DPMessageStringReceivedAsyncData* messageData = new DPMessageStringReceivedAsyncData(messangerPtr, header, GetStringFromPipe(header.DataSize()));
+			DWORD dataSize = header.DataSize();
+			auto heapData = make_shared<HeapAllocatedData>(dataSize, false);
+
+			if (dataSize > 0) {
+				void* buffer = heapData.get()->data();
+				_dpipe->Read(buffer, header.DataSize(), &nBytesRead, NULL);
+			}
+
+			if (_handleResponseAsync) {
+				DPMessageReceivedAsyncData* messageData = new DPMessageReceivedAsyncData(this, header, heapData, pipe);
 
 				DWORD _nReadThreadId;
 				auto _tHandleThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)OnMessageStringReceivedAsync, (LPVOID)messageData, 0, &_nReadThreadId);
 			}
 			else
-				OnMessageStringReceived(header, GetStringFromPipe(header.DataSize()));
+				OnMessageStringReceived(pipe, header, heapData);
 		}
 
 		//If data is binary
 		else {
+			DWORD dataSize = header.DataSize();
+			auto heapData = make_shared<HeapAllocatedData>(dataSize, false);
 
-			//ReadData from Response
-			if (serviceCode == 0) {
-				OnResponseReceived(header);
+			if (dataSize > 0) {
+				void* buffer = heapData.get()->data();
+				_dpipe->Read(buffer, header.DataSize(), &nBytesRead, NULL);
 			}
 
-			//ReadData from Message
-			else {
-				DWORD dataSize = header.DataSize();
-				auto heapData = make_shared<HeapAllocatedData>(dataSize, keepMessageAllocatedMemory);
-
-				if (dataSize > 0) {
-					//_mutexReadPipe.lock();
-					void* buffer = heapData.get()->data();
-					_dpipe->Read(buffer, header.DataSize(), &nBytesRead, NULL);
-					//_mutexReadPipe.unlock();
-				}
-				if (_handleAsync) {
-					DPRequestReceivedAsyncData* reqData = new DPRequestReceivedAsyncData;
-					auto messangerPtr = dynamic_cast<IDPipeMessanger*>(this);
-					DPMessageReceivedAsyncData* messageData = new DPMessageReceivedAsyncData(messangerPtr, header, heapData);
-
-					DWORD _nReadThreadId;
-					auto _tHandleThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)OnMessageReceivedAsync, (LPVOID)messageData, 0, &_nReadThreadId);
-				}
-				else
-					OnMessageReceived(header, heapData);
+			if (_handleResponseAsync) {
+				DPMessageReceivedAsyncData* messageData = new DPMessageReceivedAsyncData(this, header, heapData, pipe);
+				DWORD _nReadThreadId;
+				auto _tHandleThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)OnMessageReceivedAsync, (LPVOID)messageData, 0, &_nReadThreadId);
 			}
+			else
+				OnMessageReceived(pipe, header, heapData);
 		}
 	}
 
 	void DPClient::OnResponseReceived(PacketHeader& header) {
+
 		DWORD dataSize = header.DataSize();
 
 		if (dataSize < DP_RESPONSE_SIZE)
@@ -167,12 +233,32 @@ typedef std::chrono::high_resolution_clock Time;
 		_dpipe->Read(_pBufferResponse, DP_RESPONSE_SIZE, &nBytesRead, NULL);
 		FillResponseHeader(respRecord);
 
-		dataSize = dataSize - DP_RESPONSE_SIZE;
-		auto heapData = make_shared<HeapAllocatedData>(dataSize, keepResponseAllocatedMemory);
+		bool descriptorAllocated;
+		DWORD descriptorSize = respRecord.descriptorSize;
+		shared_ptr<HeapAllocatedData> descriptorData = nullptr;
 
-		if (dataSize > 0) {
-			void* buffer = new char[dataSize];
-			_dpipe->Read(buffer, dataSize, &nBytesRead, NULL);
+		if (descriptorSize <= _maxDescriptorMemoryAllocation) {
+			descriptorData = make_shared<HeapAllocatedData>(descriptorSize, _keepDescriptorMemoryAllocated);
+			_dpipe->Read(descriptorData->data(), descriptorSize);
+			descriptorAllocated = true;
+		}
+		else {
+			descriptorData = make_shared<HeapAllocatedData>(0, _keepDescriptorMemoryAllocated);
+			descriptorAllocated = false;
+		}
+
+		bool dataAllocated;
+		dataSize = dataSize - DP_RESPONSE_SIZE - descriptorSize;
+		shared_ptr<HeapAllocatedData> data = nullptr;
+
+		if (descriptorAllocated && dataSize <= _maxResponseMemoryAllocation) {
+			data = make_shared<HeapAllocatedData>(dataSize, _keepResponseMemoryAllocated);
+			_dpipe->Read(data->data(), dataSize);
+			dataAllocated = true;
+		}
+		else {
+			data = make_shared<HeapAllocatedData>(0, false);
+			dataAllocated = false;
 		}
 
 		bool requestFound = false;
@@ -182,7 +268,17 @@ typedef std::chrono::high_resolution_clock Time;
 			for (DPRequestRecord* req : _requestList) {
 				if (IsEqualGUID(req->guid, respRecord.guid)) {
 					requestFound = true;
-					shared_ptr<DPResponse> resp = shared_ptr<DPResponse>(new DPResponse(respRecord.code, respRecord.dataType, heapData));
+					shared_ptr<DPResponse> resp = make_shared<DPResponse>(
+						respRecord.code,
+						respRecord.descriptorType,
+						descriptorSize,
+						descriptorAllocated,
+						descriptorData,
+						respRecord.dataType,
+						dataSize,
+						data,
+						_dpipe
+					);
 					req->resp = resp;
 					req->succes = true;
 				}
@@ -191,7 +287,8 @@ typedef std::chrono::high_resolution_clock Time;
 		_requestListMutex.unlock();
 
 		if (!requestFound) {
-			heapData->keepAllocatedMemory = false;
+			descriptorData->keepAllocatedMemory = false;
+			data->keepAllocatedMemory = false;
 		}
 	}
 
@@ -216,20 +313,32 @@ typedef std::chrono::high_resolution_clock Time;
 		memcpy_s((char*)&responseRecord.guid, sizeof(GUID), _pBufferResponse, sizeof(GUID));
 		memcpy_s((char*)&responseRecord.code, sizeof(int), _pBufferResponse + sizeof(GUID), sizeof(int));
 		memcpy_s((char*)&responseRecord.dataType, sizeof(int), _pBufferResponse + sizeof(GUID) + sizeof(int), sizeof(int));
+		memcpy_s((char*)&responseRecord.descriptorType, sizeof(int), _pBufferResponse + sizeof(GUID) + sizeof(int) * 2, sizeof(int));
+		memcpy_s((char*)&responseRecord.descriptorSize, sizeof(int), _pBufferResponse + sizeof(GUID) + sizeof(int) * 3, sizeof(int));
 	}
 
 	void DPClient::PrepareRequestRecord(const DPRequest& request, const DPRequestRecord* requestRecord) {
 		memcpy_s(_pBufferRequest, sizeof(GUID), (char*)&requestRecord->guid, sizeof(GUID));
 		memcpy_s(_pBufferRequest + sizeof(GUID), sizeof(int), (char*)&request.code, sizeof(int));
 		memcpy_s(_pBufferRequest + sizeof(GUID) + sizeof(int), sizeof(int), (char*)&request.dataType, sizeof(int));
+		memcpy_s(_pBufferRequest + sizeof(GUID) + sizeof(int) * 2, sizeof(int), (char*)&request.descriptorType, sizeof(int));
+		memcpy_s(_pBufferRequest + sizeof(GUID) + sizeof(int) * 3, sizeof(int), (char*)&request.descriptorSize, sizeof(int));
+	}
+
+	bool DPClient::keepDescriptorMemoryAllocated() {
+		return _keepDescriptorMemoryAllocated;
+	}
+
+	void DPClient::keepDescriptorMemoryAllocated(bool value) {
+		_keepDescriptorMemoryAllocated = value;
 	}
 
 	void DPClient::ReceiveResponseAsync(LPVOID dataPtr) {
 
 		DPRequestAsyncData* reqData = (DPRequestAsyncData*)dataPtr;
-		DPClient* client = reqData->client;
+		IDPClient* client = reqData->client;
 
-		auto resp = client->Send(reqData->req, reqData->timeout);
+		auto resp = client->SendRequest(reqData->req, reqData->timeout);
 
 		if (reqData->callback)
 			reqData->callback(resp);
@@ -237,7 +346,39 @@ typedef std::chrono::high_resolution_clock Time;
 		delete reqData;
 	}
 
-	shared_ptr<DPResponse> DPClient::Send(const DPRequest& req, unsigned int timeout)
+	bool DPClient::keepResponseMemoryAllocated() {
+		return _keepResponseMemoryAllocated;
+	}
+
+	void DPClient::keepResponseMemoryAllocated(bool value) {
+		_keepResponseMemoryAllocated = value;
+	}
+
+	DWORD DPClient::maxDescriptorMemoryAllocation() {
+		return _maxDescriptorMemoryAllocation;
+	}
+
+	void DPClient::maxDescriptorMemoryAllocation(DWORD value) {
+		_maxDescriptorMemoryAllocation = value;
+	}
+
+	DWORD DPClient::maxResponseMemoryAllocation() {
+		return _maxResponseMemoryAllocation;
+	}
+
+	DWORD DPClient::maxResponseMemoryAllocationMB() {
+		return _maxResponseMemoryAllocation / 1048576;
+	}
+
+	void DPClient::maxResponseMemoryAllocation(DWORD value) {
+		_maxResponseMemoryAllocation = value;
+	}
+
+	void DPClient::maxResponseMemoryAllocationMB(DWORD value) {
+		_maxResponseMemoryAllocation = value * 1048576;
+	}
+
+	shared_ptr<DPResponse> DPClient::SendRequest(const DPRequest& req, unsigned int timeout)
 	{
 		typedef std::chrono::high_resolution_clock Time;
 		auto t0 = Time::now();
@@ -249,13 +390,23 @@ typedef std::chrono::high_resolution_clock Time;
 			_requestList.push_front(requestRecord);
 		_requestListMutex.unlock();
 
-		_mutexWritePipe.lock();
+		_mutexWrite.lock();
 			PrepareRequestRecord(req, requestRecord);
 			DWORD nBytesWritten;
-			DWORD packetSize = _nBufferRequestSize + req.dataSize;
-			PacketHeader header(packetSize, DP_REQUEST);
+			DWORD packetSize = _nBufferRequestSize + req.descriptorSize + req.dataSize;
+
+			PacketHeader header(false, packetSize);
+			header.SetDataCode(DP_REQUEST);
+
 			_dpipe->WritePacketHeader(header);
 			_dpipe->WriteRaw(_pBufferRequest, _nBufferRequestSize, &nBytesWritten);
+
+			if (req.descriptorSize > 0) {
+				if (req.descriptor != nullptr)
+					_dpipe->WriteRaw(req.descriptor, req.descriptorSize, &nBytesWritten);
+				else
+					throw exception("Unable to send request descriptor: buffer is null");
+			}
 
 			if (req.dataSize > 0) {
 				if (req.data != nullptr)
@@ -263,7 +414,7 @@ typedef std::chrono::high_resolution_clock Time;
 				else
 					throw exception("Unable to send request data: buffer is null");
 			}
-		_mutexWritePipe.unlock();
+		_mutexWrite.unlock();
 		auto t1 = Time::now();
 
 		WaitRequestLoop(requestRecord, timeout);
@@ -274,8 +425,6 @@ typedef std::chrono::high_resolution_clock Time;
 			_requestList.remove(requestRecord);
 		_requestListMutex.unlock();
 
-		shared_ptr<DPResponse> response = nullptr;
-
 		if (requestRecord->succes) {
 			shared_ptr<DPResponse> response = shared_ptr<DPResponse>(requestRecord->resp);
 			response->_send_duraction = t1 - t0;
@@ -285,33 +434,32 @@ typedef std::chrono::high_resolution_clock Time;
 			return response;
 		}
 		else {
-
 			delete requestRecord;
-			return make_shared<DPResponse>(DP_REQUEST_TIMEOUT, 0, nullptr);
+			return make_shared<DPResponse>(DP_REQUEST_TIMEOUT, 0, 0, false, nullptr, 0, 0, nullptr, _dpipe);
 		}
 	}
 
-	shared_ptr<DPResponse> DPClient::Send(int code, int dataType, void* data, DWORD dataSize, unsigned int timeout)
+	shared_ptr<DPResponse> DPClient::SendRequest(int code, int dataType, void* data, DWORD dataSize, unsigned int timeout)
 	{
 		DPRequest req;
 		req.code = code;
 		req.dataType = dataType;
 		req.data = data;
 		req.dataSize = dataSize;
-		return Send(req, timeout);
+		return SendRequest(req, timeout);
 	}
 
-	shared_ptr<DPResponse> DPClient::Send(int code, void* data, DWORD dataSize, unsigned int timeout)
+	shared_ptr<DPResponse> DPClient::SendRequest(int code, void* data, DWORD dataSize, unsigned int timeout)
 	{
 		DPRequest req;
 		req.code = code;
 		req.dataType = DP_DATA_BINARY;
 		req.data = data;
 		req.dataSize = dataSize;
-		return Send(req, timeout);
+		return SendRequest(req, timeout);
 	}
 
-	void DPClient::SendAsync(const DPRequest& req, function<void(shared_ptr<DPResponse>)> receiveResponseCallback, unsigned int timeout) {
+	void DPClient::SendRequestAsync(const DPRequest& req, function<void(shared_ptr<DPResponse>)> receiveResponseCallback, unsigned int timeout) {
 		
 		DPRequestAsyncData* reqData = new DPRequestAsyncData();
 		reqData->req = req;
@@ -323,7 +471,7 @@ typedef std::chrono::high_resolution_clock Time;
 		auto _tHandleThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ReceiveResponseAsync, (LPVOID)reqData, 0, &_nReadThreadId);
 	}
 
-	void DPClient::SendAsync(int code, int dataType, void* data, DWORD dataSize, function<void(shared_ptr<DPResponse>)> receiveResponseCallback, unsigned int timeout) {
+	void DPClient::SendRequestAsync(int code, int dataType, void* data, DWORD dataSize, function<void(shared_ptr<DPResponse>)> receiveResponseCallback, unsigned int timeout) {
 
 		DPRequest req;
 		req.code = code;
@@ -341,7 +489,7 @@ typedef std::chrono::high_resolution_clock Time;
 		auto _tHandleThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ReceiveResponseAsync, (LPVOID)reqData, 0, &_nReadThreadId);
 	}
 
-	void DPClient::SendAsync(int code, void* data, DWORD dataSize, function<void(shared_ptr<DPResponse>)> receiveResponseCallback, unsigned int timeout) {
+	void DPClient::SendRequestAsync(int code, void* data, DWORD dataSize, function<void(shared_ptr<DPResponse>)> receiveResponseCallback, unsigned int timeout) {
 
 		DPRequest req;
 		req.code = code;
@@ -359,12 +507,16 @@ typedef std::chrono::high_resolution_clock Time;
 		auto _tHandleThread = CreateThread(NULL, 0, (LPTHREAD_START_ROUTINE)ReceiveResponseAsync, (LPVOID)reqData, 0, &_nReadThreadId);
 	}
 
-	void DPClient::SetOnServerDisconnectCallback(function<void(std::shared_ptr<HeapAllocatedData> data)> function) {
+	void DPClient::SetOnServerDisconnectCallback(function<void(IDPipe* pipe, PacketHeader header)> function) {
 		_onServerDisconnect = function;
 	}
 
+	void DPClient::FreeAllocatedMemory() {
+		HeapAllocatedData::Free();
+	}
+
 	void DPClient::FreeAllocatedMemory(void* data) {
-		delete[] data;
+		HeapAllocatedData::Free(data);
 	}
 
 	bool DPClient::Connect(IDPipeHandle* pHandle) {
@@ -375,12 +527,32 @@ typedef std::chrono::high_resolution_clock Time;
 		return _dpipe->Connect(pHandle, pConnectData, nConnectDataSize);
 	}
 
-	bool DPClient::Connect(const std::wstring handleString) {
-		return _dpipe->Connect(handleString);
+	bool DPClient::Connect(IDPipeHandle* pHandle, std::string message) {
+		DWORD len = boost::numeric_cast<DWORD>(message.length());
+		return _dpipe->Connect(pHandle, message.data(), len, DP_ENCODING_UTF8);
+	}
+
+	bool DPClient::Connect(IDPipeHandle* pHandle, std::wstring message) {
+		DWORD len = boost::numeric_cast<DWORD>(message.length() * sizeof(wchar_t));
+		return _dpipe->Connect(pHandle, message.data(), len, DP_ENCODING_UNICODE);
 	}
 
 	bool DPClient::Connect(const std::wstring handleString, LPCVOID pConnectData, DWORD nConnectDataSize) {
 		return _dpipe->Connect(handleString, pConnectData, nConnectDataSize);
+	}
+
+	bool DPClient::Connect(const std::wstring handleString, std::string message) {
+		DWORD len = boost::numeric_cast<DWORD>(message.length());
+		return _dpipe->Connect(handleString, message.data(), len, DP_ENCODING_UTF8);
+	}
+
+	bool DPClient::Connect(const std::wstring handleString, std::wstring message) {
+		DWORD len = boost::numeric_cast<DWORD>(message.length() * sizeof(wchar_t));
+		return _dpipe->Connect(handleString, message.data(), len, DP_ENCODING_UNICODE);
+	}
+
+	bool DPClient::Connect(const std::wstring handleString) {
+		return _dpipe->Connect(handleString);
 	}
 
 	void DPClient::Disconnect() {

@@ -14,20 +14,26 @@ public:
 private:
 
 	IDPipe* _dpipe = nullptr;
-	DPWString* _dpwstring = nullptr;
+	DPMessanger* _dpmessanger = nullptr;
 
 	BoolTrigger connectTrigger;
 	IntTrigger messageSyncReceivedTrigger;
 	IntTrigger messageAsyncReceivedTrigger;
 
-	void ClientConnectCallback(wstring connectMessage) {
-		WriteServerLineW() << L"1. Client Connected with message: " << connectMessage << END_LINE;
+	void ClientConnectCallback(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) {
+
+		wstring message = _dpmessanger->GetWString(header, data);
+
+		WriteServerLineW() << L"1. Client Connected with message: " << message << END_LINE;
 		WriteServerLine() << "2. Sending Greeting to client" << END_LINE;
-		_dpwstring->Send(L"Hello, Client!");
+		_dpmessanger->Send(L"Hello, Client!");
 		connectTrigger.SetComplete();
 	}
 
-	void MessageRecevicedCallback(wstring message) {
+	void MessageRecevicedCallback(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) {
+
+		wstring message = _dpmessanger->GetWString(header, data);
+
 		messageSyncReceivedTrigger.Increase(1);
 
 		if (messageSyncReceivedTrigger.IsComplete())
@@ -38,11 +44,11 @@ private:
 	}
 
 	void Send10MessagesReceivedSyncConfirmation() {
-		_dpwstring->Send(L"MessagesReceivedSync!");
+		_dpmessanger->Send(L"MessagesReceivedSync!");
 	}
 
 	void Send10MessagesReceivedAsyncConfirmation() {
-		_dpwstring->Send(L"MessagesReceivedAsync!");
+		_dpmessanger->Send(L"MessagesReceivedAsync!");
 	}
 
 public:
@@ -50,9 +56,11 @@ public:
 		WriteTestName(params.pipeType);
 		_dpipe = DPipeBuilder::Create(params.pipeType, L"\\\\.\\pipe\\test-pipe-123");
 
-		_dpwstring = new DPWString(_dpipe, true);
-		_dpwstring->SetOnClientConnectHandler([this](wstring connectMessage) { ClientConnectCallback(connectMessage); });
-		_dpwstring->SetOnMessageReceivedHandler([this](wstring message) { MessageRecevicedCallback(message); });
+		_dpmessanger = new DPMessanger(_dpipe, true);
+		_dpmessanger->SetOnClientConnectHandler([this](IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) 
+			{ ClientConnectCallback(pipe, header, data); });
+		_dpmessanger->SetMessageStringReceivedHandler([this](IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data)
+			{ MessageRecevicedCallback(pipe, header, data); });
 
 		_dpipe->Start();
 		auto hadnle = _dpipe->GetHandle();
@@ -78,7 +86,7 @@ public:
 		Sleep(100);
 
 		WriteServerLine() << "7. Disconnecting From Pipe" << END_LINE;
-		_dpwstring->Disconnect(L"I am disconnect, motherfucker!");
+		_dpmessanger->Disconnect(L"I am disconnect, motherfucker!");
 
 		Sleep(500);
 		std::cout << std::endl;
@@ -88,8 +96,8 @@ TestRegistrationServer ServerTest10() {
 	TestRegistrationServer registration;
 	registration.enabled = true;
 	registration.name = L"Test10";
-	registration.title = L"DPWString server - async, client - async";
-	registration.description = L"Description: Testing scenario when DPWString server and client handling messages in async mode";
+	registration.title = L"DPMessanger server - async, client - async";
+	registration.description = L"Description: Testing scenario when DPMessanger server and client handling messages in async mode";
 	registration.createHandler = [registration]() { return new ServerTest10Class(registration); };
 	return registration;
 }

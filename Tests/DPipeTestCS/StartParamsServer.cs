@@ -4,7 +4,7 @@ namespace DPipeTestCS
 {
     public class StartParamsServer
     {
-        private StartParamsServer(string path, DPIPE_TYPE pipeType, string testName, bool newConsole, Dictionary<string, string> flags) 
+        private StartParamsServer(string path, DP_TYPE pipeType, string testName, bool newConsole, Dictionary<string, string> flags) 
         {
             Path = path;
             PIPE_TYPE = pipeType;
@@ -17,7 +17,7 @@ namespace DPipeTestCS
 
         public string Path { get; init; }
 
-        public DPIPE_TYPE PIPE_TYPE { get; set; }
+        public DP_TYPE PIPE_TYPE { get; set; }
 
         public string TestName { get; init; }
 
@@ -30,9 +30,9 @@ namespace DPipeTestCS
 
             var pipeType = args[2] switch
             {
-                "anonymus" => DPIPE_TYPE.ANONYMUS_PIPE,
-                "named" => DPIPE_TYPE.NAMED_PIPE,
-                "all" => DPIPE_TYPE.ANONYMUS_PIPE,
+                "anonymous" => DP_TYPE.ANONYMOUS_PIPE,
+                "named" => DP_TYPE.NAMED_PIPE,
+                "all" => DP_TYPE.ANONYMOUS_PIPE,
                 _ => throw new ArgumentException("Unknown pipeType argument"),
             };
             Dictionary<string, string> flags;

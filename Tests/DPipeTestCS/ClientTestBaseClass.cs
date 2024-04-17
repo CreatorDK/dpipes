@@ -17,9 +17,9 @@ namespace DPipeTestCS
             Description = description;
         }
 
-        public void WriteTestName(DPIPE_TYPE pipeType)
+        public void WriteTestName(DP_TYPE pipeType)
         {
-            if (pipeType == DPIPE_TYPE.ANONYMUS_PIPE)
+            if (pipeType == DP_TYPE.ANONYMOUS_PIPE)
                 Console.WriteLine("Anonymus Pipe Client");
 
             else
@@ -45,10 +45,10 @@ namespace DPipeTestCS
             Console.ReadKey();
         }
 
-        public static void WriteDisconnectionLine(DPIPE_TYPE pipeType)
+        public static void WriteDisconnectionLine(DP_TYPE pipeType)
         {
             string pipeTypeString;
-            if (pipeType == DPIPE_TYPE.ANONYMUS_PIPE)
+            if (pipeType == DP_TYPE.ANONYMOUS_PIPE)
                 pipeTypeString = "ANONYMUS";
             else
                 pipeTypeString = "NAMED";

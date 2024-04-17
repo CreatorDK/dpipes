@@ -3,9 +3,7 @@
 #include <iostream>
 #include <fstream>
 #include <map>
-#include "dpipebase.h"
-
-
+#include <dpipebase.h>
 
 enum ROLE {
 	SERVER = 1,
@@ -18,7 +16,7 @@ struct start_params_server {
 	//start_params_server operator=(const start_params_server& obj) = delete;
 
 	std::wstring path;
-	crdk::dpipes::DPIPE_TYPE pipeType = crdk::dpipes::DPIPE_TYPE::ANONYMOUS_PIPE;
+	crdk::dpipes::DP_TYPE pipeType = crdk::dpipes::DP_TYPE::ANONYMOUS_PIPE;
 	std::wstring test;
 	std::map<std::wstring, std::wstring> flags;
 	bool newConsole = 0;
@@ -66,7 +64,7 @@ public:
 	ServerTest(TestRegistrationServer registration);
 	virtual void ExecuteWrapper(start_params_server& params);
 	virtual void Execute(start_params_server& params) = 0;
-	void WriteTestName(const crdk::dpipes::DPIPE_TYPE type) const;
+	void WriteTestName(const crdk::dpipes::DP_TYPE type) const;
 };
 
 class ClientTest {
@@ -80,7 +78,7 @@ public:
 	ClientTest(TestRegistrationClient registration);
 	virtual void ExecuteWrapper(start_params_client& params);
 	virtual void Execute(start_params_client& params) = 0;
-	void WriteTestName(const crdk::dpipes::DPIPE_TYPE type) const;
+	void WriteTestName(const crdk::dpipes::DP_TYPE type) const;
 };
 
 #define END_LINE '\n'

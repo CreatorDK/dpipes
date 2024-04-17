@@ -49,11 +49,11 @@ namespace DPipeTestCS.ServerTests
             if (_dpipe == null)
                 return;
 
-            _dpipe.OnClientConnectCallback = OnClientConnect;
+            _dpipe.OnOtherSideConnectCallback = OnClientConnect;
             _dpipe.OnPacketHeaderReceivedCallback = OnPacketHeaderReceived;
             _dpipe.OnOtherSideDisconnectCallback = OnOtherSideDisconnect;
 
-            if (_dpipe is DPipeNamed pipeNamed)
+            if (_dpipe is DPNamed pipeNamed)
                 pipeNamed.UseRemote = true;
 
             //_dpipe.Start();

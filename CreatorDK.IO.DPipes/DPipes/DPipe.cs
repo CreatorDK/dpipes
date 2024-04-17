@@ -1,28 +1,29 @@
 ﻿using System;
+using System.IO;
 using System.IO.Pipes;
 using System.Text;
 using System.Threading;
 
 namespace CreatorDK.IO.DPipes
 {
-    public enum DPIPE_TYPE
+    public enum DP_TYPE
     {
-        ANONYMUS_PIPE = 1,
+        ANONYMOUS_PIPE = 1,
         NAMED_PIPE = 2
     }
 
-    public enum DPIPE_MODE
+    public enum DP_MODE
     {
         UNSTARTED = 0,
         INNITIATOR = 1,
         CLIENT = 2,
-        INNICIATOR_CLIENT
+        INNICIATOR_CLIENT = 3
     }
 
     public abstract class DPipe
     {
         protected readonly string _name;
-        protected DPIPE_MODE _mode = DPIPE_MODE.UNSTARTED;
+        protected DP_MODE _mode = DP_MODE.UNSTARTED;
 
         protected PipeStream _readPipeStream;
         protected PipeStream _writePipeStream;
@@ -45,26 +46,34 @@ namespace CreatorDK.IO.DPipes
         protected int _skipBufferSize = 4096;
         protected byte[] _skipBuffer;
 
-        public Action<PacketHeader> OnClientConnectCallback { get; set; }
+        protected bool _clientEmulating = false;
+        protected uint _mtu;
+
+        public uint ConnectionTimeout { get; set; }
+
+        public Action<PacketHeader> OnOtherSideConnectCallback { get; set; }
         public Action<PacketHeader> OnOtherSideDisconnectCallback { get; set; }
         public Action<PacketHeader> OnPacketHeaderReceivedCallback { get; set; }
+        public Action<PacketHeader> OnPingReceivedCallback { get; set; }
+        public Action<PacketHeader> OnPongReceivedCallback { get; set; }
+        public Action<PacketHeader> OnConfigurationReceivedCallback { get; set; }
 
         public int InBufferSize => _inBufferSize;
         public int OutBufferSize => _outBufferSize;
-        public abstract DPIPE_TYPE Type { get; }
-        public DPIPE_MODE Mode => _mode;
+        public abstract DP_TYPE Type { get; }
+        public DP_MODE Mode => _mode;
         public string Name => _name;
         public int BytesToRead => _bytesToRead;
         public bool IsAlive => _isAlive;
         public PipeStream ReadPipeStream => _readPipeStream;
         public PipeStream WritePipeStream => _writePipeStream;
-        protected DPipe(string name, int inBufferSize, int outBufferSize)
+        protected DPipe(string name, uint mtu, int inBufferSize, int outBufferSize)
         {
+            _mtu = mtu;
             _name = name;
             _inBufferSize = inBufferSize;
             _outBufferSize = outBufferSize;
             _packetPuilder = new PacketBuilder();
-
             _skipBuffer = new byte[_skipBufferSize];
         }
         public virtual void ServicePacketReceived(PacketHeader ph)
@@ -73,29 +82,159 @@ namespace CreatorDK.IO.DPipes
 
             switch (command)
             {
-                case Constants.SERVICE_CODE_CONNECT:
+                case Constants.DP_SERVICE_CODE_CONNECT:
                     OnClientConnect(ph);
                     break;
-                case Constants.SERVICE_CODE_DISCONNECT:
+                case Constants.DP_SERVICE_CODE_DISCONNECT:
                     OnOtherSideDisconnect(ph);
                     break;
-                case Constants.SERVICE_CODE_TERMINATING:
-                    OnTerminating();
+                case Constants.DP_SERVICE_CODE_TERMINATING:
+                    OnTerminating(ph);
+                    break;
+                case Constants.DP_SERVICE_CODE_PING:
+                    OnPingReceivedInner(ph);
+                    break;
+                case Constants.DP_SERVICE_CODE_PONG:
+                    OnPongReceivedInner(ph);
+                    break;
+                case Constants.DP_SERVICE_CODE_MTU_REQUEST:
+                    OnMtuRequestReceived(ph);
+                    break;
+                case Constants.DP_SERVICE_CODE_MTU_RESPONSE:
+                    OnMtuResponseReceived(ph);
+                    break;
+                case Constants.DP_SERVICE_CODE_SEND_CONFIGURATION:
+                    OnConfigurationReceived(ph);
                     break;
             }
+        }
+        private void OnConfigurationReceived(PacketHeader ph)
+        {
+            if (OnConfigurationReceivedCallback != null)
+            {
+                OnConfigurationReceivedCallback.Invoke(ph);
+
+                if (_bytesToRead > 0)
+                    Skip(_bytesToRead);
+            }
+
+            else
+                Skip(ph);
+        }
+        public void SendConfiguration(byte[] data)
+        {
+            Write(Constants.DP_SERVICE_CODE_SEND_CONFIGURATION, data, 0, data.Length);
+        }
+        public void SendPing(PipeStream stream)
+        {
+            PacketHeader header = new PacketHeader(true, 0);
+            header.ServiceCode = Constants.DP_SERVICE_CODE_PING;
+            _packetPuilder.PrepareHeader(header);
+            _packetPuilder.WriteHeader(stream);
+        }
+        public void SendPong(PipeStream stream)
+        {
+            PacketHeader header = new PacketHeader(true, 0);
+            header.ServiceCode = Constants.DP_SERVICE_CODE_PONG;
+            _packetPuilder.PrepareHeader(header);
+            _packetPuilder.WriteHeader(stream);
+        }
+        protected void OnPingReceivedInner(PacketHeader ph)
+        {
+            SendPong(_writePipeStream);
+
+            if (OnPingReceivedCallback != null)
+            {
+                OnPingReceivedCallback.Invoke(ph);
+
+                if (_bytesToRead > 0)
+                    Skip(_bytesToRead);
+            }
+
+            else
+                Skip(ph);
+        }
+        protected void OnPongReceivedInner(PacketHeader ph)
+        {
+            if (OnPongReceivedCallback != null)
+            {
+                OnPongReceivedCallback.Invoke(ph);
+
+                if (_bytesToRead > 0)
+                    Skip(_bytesToRead);
+            }
+
+            else
+                Skip(ph);
+        }
+        protected virtual void OnMtuRequestReceived(PacketHeader ph)
+        {
+            byte[] mtuBytes = new byte[4];
+            Read(mtuBytes, 0, 4);
+            uint mtu = BitConverter.ToUInt32(mtuBytes, 0);
+
+            if (mtu < _mtu)
+                _mtu = mtu;
+
+            SendMtuResponse(_writePipeStream, _mtu);
+        }
+        protected virtual void OnMtuResponseReceived(PacketHeader ph)
+        {
+            byte[] mtuBytes = new byte[4];
+            Read(mtuBytes, 0, 4);
+            uint mtu = BitConverter.ToUInt32(mtuBytes, 0);
+
+            if (mtu < _mtu)
+                _mtu = mtu;
+        }
+        protected virtual void SendMtuRequest(PipeStream pipe, uint mtu)
+        {
+            PacketHeader header = new PacketHeader(true, 4);
+            header.ServiceCode = Constants.DP_SERVICE_CODE_MTU_REQUEST;
+            _packetPuilder.PrepareHeader(header);
+            _packetPuilder.WriteHeader(_writePipeStream);
+            byte[] mtuBytes = BitConverter.GetBytes(mtu);
+            WriteRaw(pipe, mtuBytes, 0, 4);
+        }
+        protected virtual void SendMtuResponse(PipeStream pipe, uint mtu)
+        {
+            PacketHeader header = new PacketHeader(true, 4);
+            header.ServiceCode = Constants.DP_SERVICE_CODE_MTU_RESPONSE;
+            _packetPuilder.PrepareHeader(header);
+            _packetPuilder.WriteHeader(_writePipeStream);
+            byte[] mtuBytes = BitConverter.GetBytes(mtu);
+            WriteRaw(pipe, mtuBytes, 0, 4);
         }
         protected virtual void OnClientConnect(PacketHeader ph)
         {
             _isAlive = true;
 
-            OnClientConnectCallback?.Invoke(ph);
+            if (OnOtherSideConnectCallback != null)
+            {
+                OnOtherSideConnectCallback.Invoke(ph);
+
+                if (_bytesToRead > 0)
+                    Skip(_bytesToRead);
+            }
+
+            else
+                Skip(ph);
         }
         protected abstract void OnPipeClientConnect();
         protected virtual void OnOtherSideDisconnect(PacketHeader ph) 
         {
             _isAlive = false;
 
-            OnOtherSideDisconnectCallback?.Invoke(ph);
+             if (OnOtherSideDisconnectCallback != null)
+            {
+                OnOtherSideDisconnectCallback.Invoke(ph);
+
+                if (_bytesToRead > 0)
+                    Skip(_bytesToRead);
+            }
+
+             else
+                Skip(ph);
 
             _otherSideDisconnecting = true;
         }
@@ -106,16 +245,22 @@ namespace CreatorDK.IO.DPipes
 
             DisconnectPipe();
 
-            _mode = DPIPE_MODE.UNSTARTED;
+            _mode = DP_MODE.UNSTARTED;
         }
         protected virtual void OnPacketHeaderReceived(PacketHeader ph)
         {
-            OnPacketHeaderReceivedCallback?.Invoke(ph);
-        }
-        public virtual void OnTerminating() 
-        {
+            if (OnPacketHeaderReceivedCallback != null)
+            {
+                OnPacketHeaderReceivedCallback.Invoke(ph);
 
+                if (_bytesToRead > 0)
+                    Skip(_bytesToRead);
+            }
+                
+            else
+                Skip(ph);
         }
+        public virtual void OnTerminating(PacketHeader ph) { }
         public abstract int Read(byte[] buffer, int offset, int count);
         public virtual byte[] Read(PacketHeader header, int offset = 0)
         {
@@ -125,12 +270,13 @@ namespace CreatorDK.IO.DPipes
             if (bytesToRead > 0)
             {
                 data = new byte[bytesToRead];
-                Read(data, offset, bytesToRead);
+                Read(data, (int)offset, (int)bytesToRead);
             }
 
             return data;
         }
         public abstract void WritePacketHeader(PacketHeader header);
+        public abstract void WriteRaw(PipeStream pipeStream, byte[] buffer, int offset, int count);
         public abstract void WriteRaw(byte[] buffer, int offset, int count);
         public abstract void Write(byte[] buffer, int offset, int count);
         public virtual void Write(byte[] buffer)
@@ -142,40 +288,44 @@ namespace CreatorDK.IO.DPipes
         public abstract string GetHandleString();
         public abstract void Start();
         public abstract void Connect(IDPipeHandle dPipeHandle);
-        public abstract void Connect(IDPipeHandle dPipeHandle, byte[] connectData);
-        public virtual void Connect(IDPipeHandle dPipeHandle, string connectMessage, Encoding encoding = null)
-        {
-            encoding = encoding == null ? Encoding.Default : encoding;
-
-            byte[] connectData = null;
-            if (!string.IsNullOrEmpty(connectMessage))
-                connectData = encoding.GetBytes(connectMessage);
-
-            Connect(dPipeHandle, connectData);
-        }
+        public abstract void Connect(IDPipeHandle dPipeHandle, byte[] connectData, uint prefix = 0);
         public abstract void Connect(string handleString);
-        public abstract void Connect(string handleString, byte[] data);
-        public virtual void Connect(string handleString, string connectMessage, Encoding encoding = null)
+        public abstract void Connect(string handleString, byte[] data, uint prefix = 0);
+        public virtual void Disconnect(byte[] disconnectData, uint prefix = 0)
         {
-            encoding = encoding == null ? Encoding.Default : encoding;
-
-            byte[] connectData = null;
-
-            if (connectMessage != null)
-                connectData = encoding.GetBytes(connectMessage);
-
-            Connect(handleString, connectData);
-        }
-        public virtual void Disconnect(byte[] disconnectData)
-        {
-            if (_mode == DPIPE_MODE.UNSTARTED)
+            if (_mode == DP_MODE.UNSTARTED)
                 return;
+
+            if ((_mode == DP_MODE.INNITIATOR || _mode == DP_MODE.INNICIATOR_CLIENT) && !_isAlive)
+            {
+                OnPingReceivedCallback = null;
+                OnPongReceivedCallback = null;
+                OnOtherSideConnectCallback = null;
+                OnOtherSideDisconnectCallback = null;
+                OnPacketHeaderReceivedCallback = null;
+
+                var handle = GetHandle();
+                var virtualClient = CreateNewInstance();
+                this._clientEmulating = true;
+                virtualClient._clientEmulating = true;
+                virtualClient.Connect(handle);
+                virtualClient.Disconnect();
+
+                while (virtualClient.Mode != DP_MODE.UNSTARTED)
+                {
+                    Thread.Sleep(1);
+                }
+                return;
+            }
 
             if (!_otherSideDisconnecting && _isAlive)
             {
                 int disconnectDataSize = disconnectData == null ? 0 : disconnectData.Length;
 
-                _packetPuilder.PrepareServiceHeader(Constants.SERVICE_CODE_DISCONNECT, disconnectDataSize);
+                PacketHeader header = new PacketHeader(true, disconnectDataSize);
+                header.ServiceCode = Constants.DP_SERVICE_CODE_DISCONNECT;
+                header.ServicePrefix = prefix;
+                _packetPuilder.PrepareHeader(header);
 
                 if (_writePipeStream != null)
                     _packetPuilder.WriteHeader(_writePipeStream);
@@ -192,20 +342,12 @@ namespace CreatorDK.IO.DPipes
         {
             Disconnect(null);
         }
-        public virtual void Disconnect(string disconnectMessage, Encoding encoding = null)
-        {
-            encoding = encoding == null ? Encoding.Default : encoding;
-
-            byte[] disonnectData = null;
-
-            if (!string.IsNullOrEmpty(disconnectMessage))
-                disonnectData = encoding.GetBytes(disconnectMessage);
-
-            Disconnect(disonnectData);
-        }
         public abstract void DisconnectPipe();
         public virtual void Skip(int bytesToSkip) 
         {
+            if (bytesToSkip == 0)
+                return;
+
             if (bytesToSkip > _bytesToRead)
                 throw new Exception("Unable to skip more bytes then specified in PacketHeader");
 
@@ -225,6 +367,71 @@ namespace CreatorDK.IO.DPipes
         public virtual void Skip(PacketHeader header)
         {
             Skip(header.DataSize);
+        }
+        public abstract DPipe CreateNewInstance();
+        public virtual void WriteFrom(DPipe source, int count, int bufferLength)
+        {
+            byte[] buffer = new byte[bufferLength];
+
+            var cyclecs = count / bufferLength;
+            var rest = count % bufferLength;
+
+            for (int i = 0; i < cyclecs; i++)
+            {
+                source.Read(buffer, 0, bufferLength);
+                Write(buffer, 0, bufferLength);
+            }
+
+            source.Read(buffer, 0, rest);
+            Write(buffer, 0, rest);
+        }
+        public virtual void WriteFrom(Stream source, int count, int bufferLength)
+        {
+            byte[] buffer = new byte[bufferLength];
+
+            var cyclecs = count / bufferLength;
+            var rest = count % bufferLength;
+
+            for (int i = 0; i < cyclecs; i++)
+            {
+                source.Read(buffer, 0, bufferLength);
+                Write(buffer, 0, bufferLength);
+            }
+
+            source.Read(buffer, 0, rest);
+            Write(buffer, 0, rest);
+        }
+        public virtual void CopyTo(DPipe dest, int count, int bufferLength)
+        {
+            byte[] buffer = new byte[bufferLength];
+
+            var cyclecs = count / bufferLength;
+            var rest = count % bufferLength;
+
+            for (int i = 0; i < cyclecs; i++)
+            {
+                Read(buffer, 0, bufferLength);
+                dest.Write(buffer, 0, bufferLength);
+            }
+
+            Read(buffer, 0, rest);
+            dest.Write(buffer, 0, rest);
+        }
+        public virtual void CopyTo(Stream dest, int count, int bufferLength)
+        {
+            byte[] buffer = new byte[bufferLength];
+
+            var cyclecs = count / bufferLength;
+            var rest = count % bufferLength;
+
+            for (int i = 0; i < cyclecs; i++)
+            {
+                Read(buffer, 0, bufferLength);
+                dest.Write(buffer, 0, bufferLength);
+            }
+
+            Read(buffer, 0, rest);
+            dest.Write(buffer, 0, rest);
         }
     }
 }

@@ -54,9 +54,9 @@ namespace DPipeTestCS
         {
             if (bothPipes)
             {
-                parameters.PIPE_TYPE = CreatorDK.IO.DPipes.DPIPE_TYPE.ANONYMUS_PIPE;
+                parameters.PIPE_TYPE = CreatorDK.IO.DPipes.DP_TYPE.ANONYMOUS_PIPE;
                 RunServerTest(parameters);
-                parameters.PIPE_TYPE = CreatorDK.IO.DPipes.DPIPE_TYPE.NAMED_PIPE;
+                parameters.PIPE_TYPE = CreatorDK.IO.DPipes.DP_TYPE.NAMED_PIPE;
                 RunServerTest(parameters);
             }
             else

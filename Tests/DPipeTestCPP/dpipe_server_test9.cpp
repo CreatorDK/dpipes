@@ -15,21 +15,27 @@ public:
 
 private:
 	IDPipe* _dpipe = nullptr;
-	DPWString* _dpwstring = nullptr;
+	DPMessanger* _dpmessanger = nullptr;
 
 	BoolTrigger connectTrigger;
 	BoolTrigger disconnectTrigger;
 	IntTrigger messageSyncReceivedTrigger;
 	IntTrigger messageAsyncReceivedTrigger;
 
-	void ClientConnectCallback(wstring connectMessage) {
-		WriteServerLineW() << L"1. Client Connected with message: " << connectMessage << END_LINE;
+	void ClientConnectCallback(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) {
+
+		wstring message = _dpmessanger->GetWString(header, data);
+
+		WriteServerLineW() << L"1. Client Connected with message: " << message << END_LINE;
 		WriteServerLine() << "2. Sending Greeting to client" << END_LINE;
-		_dpwstring->Send(L"Hello, Client!");
+		_dpmessanger->Send(L"Hello, Client!");
 		connectTrigger.SetComplete();
 	}
 
-	void MessageRecevicedCallback(wstring message) {
+	void MessageRecevicedCallback(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) {
+
+		wstring message = _dpmessanger->GetWString(header, data);
+
 		messageSyncReceivedTrigger.Increase(1);
 
 		if (messageSyncReceivedTrigger.IsComplete())
@@ -40,15 +46,18 @@ private:
 	}
 
 	void Send10MessagesReceivedSyncConfirmation() {
-		_dpwstring->Send(L"MessagesReceivedSync!");
+		_dpmessanger->Send(L"MessagesReceivedSync!");
 	}
 
 	void Send10MessagesReceivedAsyncConfirmation() {
-		_dpwstring->Send(L"MessagesReceivedAsync!");
+		_dpmessanger->Send(L"MessagesReceivedAsync!");
 	}
 
-	void ClientDisconnectCallback(wstring disconnectMessage) {
-		WriteServerLineW() << L"7. Client Disconecting with message: " << disconnectMessage << END_LINE;
+	void ClientDisconnectCallback(IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) {
+
+		wstring message = _dpmessanger->GetWString(header, data);
+
+		WriteServerLineW() << L"7. Client Disconecting with message: " << message << END_LINE;
 		disconnectTrigger.SetComplete();
 	}
 
@@ -57,10 +66,13 @@ public:
 		WriteTestName(params.pipeType);
 		_dpipe = DPipeBuilder::Create(params.pipeType, L"\\\\.\\pipe\\test-pipe-123");
 
-		_dpwstring = new DPWString(_dpipe, true);
-		_dpwstring->SetOnClientConnectHandler([this](wstring connectMessage) { ClientConnectCallback(connectMessage); });
-		_dpwstring->SetOnMessageReceivedHandler([this](wstring message) { MessageRecevicedCallback(message); });
-		_dpwstring->SetOnOtherSideDisconnectHandler([this](wstring disconnectMessage) { ClientDisconnectCallback(disconnectMessage); });
+		_dpmessanger = new DPMessanger(_dpipe, true);
+		_dpmessanger->SetOnClientConnectHandler([this](IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) 
+			{ ClientConnectCallback(pipe, header, data); });
+		_dpmessanger->SetMessageStringReceivedHandler([this](IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data)
+			{ MessageRecevicedCallback(pipe, header, data); });
+		_dpmessanger->SetOnOtherSideDisconnectHandler([this](IDPipe* pipe, PacketHeader header, std::shared_ptr<HeapAllocatedData> data) 
+			{ ClientDisconnectCallback(pipe, header, data); });
 
 		_dpipe->Start();
 		auto hadnle = _dpipe->GetHandle();
@@ -85,7 +97,7 @@ public:
 		Send10MessagesReceivedAsyncConfirmation();
 
 		wait(disconnectTrigger);
-		_dpwstring->Disconnect();
+		_dpmessanger->Disconnect();
 		Sleep(500);
 		std::cout << std::endl;
 	}
@@ -95,8 +107,8 @@ TestRegistrationServer ServerTest9() {
 	TestRegistrationServer registration;
 	registration.enabled = true;
 	registration.name = L"Test9";
-	registration.title = L"DPWString server - async, client - sync";
-	registration.description = L"Description: Testing scenario when DPWString server in async mode and client in sync mode";
+	registration.title = L"DPMessanger server - async, client - sync";
+	registration.description = L"Description: Testing scenario when DPMessanger server in async mode and client in sync mode";
 	registration.createHandler = [registration]() { return new ServerTest9Class(registration); };
 	return registration;
 }

@@ -9,7 +9,7 @@ namespace CreatorDK.IO.DPipes
         private readonly byte[] _pBufferHeaderIn;
         private readonly byte[] _pBufferHeaderOut;
 
-        public PacketBuilder(int bufferHeaderSize = (int)Constants.PACKET_HEADER_SIZE)
+        public PacketBuilder(int bufferHeaderSize = (int)Constants.DP_PACKET_HEADER_SIZE)
         {
             _bufferHeaderSize = bufferHeaderSize;
             _pBufferHeaderIn = new byte[bufferHeaderSize];
@@ -25,11 +25,11 @@ namespace CreatorDK.IO.DPipes
                 if (dpipe.IsAlive)
                     throw new Exception("Unable to read packet header from stream");
                 else
-                    return new PacketHeader(0, Constants.SERVICE_CODE_TERMINATING);
+                    return new PacketHeader(0, Constants.DP_SERVICE_CODE_TERMINATING);
             }
 
             int dataSize = BitConverter.ToInt32(_pBufferHeaderIn, 0);
-            uint serviceCode = BitConverter.ToUInt32(_pBufferHeaderIn, sizeof(uint));
+            uint serviceCode = BitConverter.ToUInt32(_pBufferHeaderIn, sizeof(int));
 
             return new PacketHeader(dataSize, serviceCode);
         }
@@ -41,6 +41,11 @@ namespace CreatorDK.IO.DPipes
 
             System.Buffer.BlockCopy(dataSizeBytes, 0, _pBufferHeaderOut, 0, dataSizeBytes.Length);
             System.Buffer.BlockCopy(serviceCodeBytes, 0, _pBufferHeaderOut, dataSizeBytes.Length, serviceCodeBytes.Length);
+        }
+
+        public void PrepareHeader(PacketHeader header)
+        {
+            PrepareHeader(header.Code, header.DataSize);
         }
 
         public void PrepareServiceHeader(uint serviceCode, int dataSize = 0)
@@ -57,7 +62,7 @@ namespace CreatorDK.IO.DPipes
 
         public void PrepareClientHeader(int dataSize)
         {
-            PrepareClientHeader(Constants.SERVICE_CODE_RAW_CLIENT, dataSize);
+            PrepareClientHeader(Constants.DP_SERVICE_CODE_RAW_CLIENT, dataSize);
         }
 
         public void WriteHeader(PipeStream pipeStream)

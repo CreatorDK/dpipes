@@ -13,22 +13,22 @@ private:
 	IDPipe* _dpipe = nullptr;
 	BoolTrigger clientDisconnectedTrigger;
 
-	void ClientConnectCallback(PacketHeader packetHeader) {
+	void ClientConnectCallback(IDPipe* pipe, PacketHeader packetHeader) {
 		WriteServerLine() << "1. Client Connected. Receive " << to_string(packetHeader.DataSize()) << " b. Skipping...";
 		_dpipe->Skip(packetHeader);
 		cout << "Complete" << endl;
 	}
 
-	void ClientDisconnectCallback(PacketHeader packetHeader) {
+	void ClientDisconnectCallback(IDPipe* pipe, PacketHeader packetHeader) {
 		WriteServerLine() << "2. Client Disconecting. Receive " << to_string(packetHeader.DataSize()) << " b. Skipping...";
 		_dpipe->Skip(packetHeader);
 		cout << "Complete" << endl;
 		clientDisconnectedTrigger.SetComplete();
 	}
 
-	void PacketHeaderRecevicedCallback(PacketHeader packetHeader) {
+	void PacketHeaderRecevicedCallback(IDPipe* pipe, PacketHeader packetHeader) {
 		WriteServerLine() << "Packet Received " << to_string(packetHeader.DataSize()) << " b. Skipping..." << END_LINE;
-		_dpipe->Skip(packetHeader);
+		//_dpipe->Skip(packetHeader);
 		cout << "Complete" << endl;
 	}
 
@@ -39,8 +39,8 @@ public:
 		_dpipe = DPipeBuilder::Create(params.pipeType, L"\\\\.\\pipe\\test-pipe-123");
 
 		//_dpipe->SetClientConnectCallback([this](PacketHeader packet) { ClientConnectCallback(packet); });
-		_dpipe->SetPacketHeaderRecevicedCallback([this](PacketHeader packet) { PacketHeaderRecevicedCallback(packet); });
-		_dpipe->SetOtherSideDisconnectCallback([this](PacketHeader packet) { ClientDisconnectCallback(packet); });
+		_dpipe->SetPacketHeaderRecevicedCallback([this](IDPipe* pipe, PacketHeader packet) { PacketHeaderRecevicedCallback(pipe, packet); });
+		_dpipe->SetOtherSideDisconnectCallback([this](IDPipe* pipe, PacketHeader packet) { ClientDisconnectCallback(pipe, packet); });
 
 		_dpipe->Start();
 		auto hadnle = _dpipe->GetHandle();

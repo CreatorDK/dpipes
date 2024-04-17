@@ -5,20 +5,19 @@ using System.Threading.Tasks;
 
 namespace CreatorDK.IO.DPipes
 {
-    public enum DPipeMessageType
+    public enum DP_MESSAGE_TYPE
     {
-        Message = 1,
-        Info = 2,
-        Warning = 3,
-        Error = 4
+        MESSAGE = 1,
+        MESSAGE_INFO = 2,
+        MESSAGE_WARNING = 3,
+        MESSAGE_ERROR = 4
     }
 
-    public class DPipeMessangerBase
+    public class DPMessangerBase
     {
         protected readonly DPipe _dpipe;
         protected Encoding _encoding;
         protected Mutex _mutexWritePipe;
-        protected byte[] _stringBuffer;
 
         public delegate void MessageStringRecevied(string message);
         public delegate void MessageDataRecevied(byte[] data);
@@ -26,13 +25,16 @@ namespace CreatorDK.IO.DPipes
         { 
             get 
             {
+                if (_encoding == null)
+                    _encoding = Encoding.Unicode;
+
                 return _encoding; 
             }
 
             set
             {
                 if (value == null)
-                    _encoding = Encoding.Default;
+                    _encoding = Encoding.Unicode;
                 else
                     _encoding = value;
             }
@@ -45,27 +47,72 @@ namespace CreatorDK.IO.DPipes
         public MessageDataRecevied OnWarningDataReceived { get; set; }
         public MessageStringRecevied OnErrorStringReceived { get; set; }
         public MessageDataRecevied OnErrorDataReceived { get; set; }
-        public DPipeMessangerBase(DPipe dpipe, Encoding encoding, uint stringBufferSize = 4096)
+        public DPMessangerBase(DPipe dpipe, Encoding encoding, uint stringBufferSize = 4096)
         {
             _dpipe = dpipe;
-            _encoding = encoding == null ? Encoding.Default : encoding;
+            Encoding = encoding;
             _mutexWritePipe = new Mutex(false);
-            _stringBuffer = new byte[stringBufferSize];
         }
-        protected virtual void CheckStringBufferSize(int size)
+        public static Encoding GetEncoding(uint encodingCode)
         {
-            if (size > _stringBuffer.Length) 
-                _stringBuffer = new byte[(int)(size * 1.5)];
+            switch (encodingCode)
+            {
+                case 1: 
+                    return Encoding.Unicode;
+                default:
+                    return Encoding.UTF8;
+            }
         }
-        protected virtual string GetStringFromPipe(int size)
+        public static uint GetEncodingCode(PacketHeader header)
         {
-            CheckStringBufferSize(size);
-            _dpipe.Read(_stringBuffer, 0, size);
-            return _encoding.GetString(_stringBuffer, 0, size);
+            if (header.IsService)
+                return header.ServicePrefix;
+
+            return header.DataPrefix;
+        }
+        public static uint GetEncodingCode(Encoding encoding)
+        {
+            if (encoding == null)
+                return 1;
+
+            if (encoding == Encoding.UTF8)
+                return 0;
+
+            return 1;
+        }
+        public Encoding GetEncoding(PacketHeader header)
+        {
+            var encodingCode = GetEncodingCode(header);
+            return GetEncoding(encodingCode);
+        }
+        public static uint AddEncodingCode(uint serviceCode, uint encodingCode)
+        {
+            var encodingRaw = encodingCode << 24;
+            return serviceCode | encodingRaw;
+        }
+        public virtual string GetString(PacketHeader header, Encoding encoding = null)
+        {
+            var buffer = new byte[header.DataSize];
+
+            _dpipe.Read(buffer, 0, header.DataSize);
+
+            if (encoding == null)
+            {
+                var encodingCode = GetEncodingCode(header);
+                encoding = GetEncoding(encodingCode);
+            }
+
+            return encoding.GetString(buffer, 0, header.DataSize);
+        }
+
+        public string GetString(PacketHeader header, byte[] data)
+        {
+            return GetEncoding(header).GetString(data);
         }
         protected virtual void OnMessageDataReceivedInner(PacketHeader header, byte[] data)
         {
-            switch (header.Command) 
+            //Get data code ignoring first 8 bits (using for encoding)
+            switch (header.DataCodeOnly) 
             {
                 case Constants.DP_MESSAGE_DATA:
                     OnMessageDataReceived?.Invoke(data);
@@ -83,7 +130,8 @@ namespace CreatorDK.IO.DPipes
         }
         protected virtual void OnMessageStringReceivedInner(PacketHeader header, string message)
         {
-            switch (header.Command)
+            //Removing Encoding code from ServiceCode
+            switch (header.DataCodeOnly)
             {
                 case Constants.DP_MESSAGE_STRING:
                     OnMessageStringReceived?.Invoke(message);
@@ -109,12 +157,16 @@ namespace CreatorDK.IO.DPipes
         {
             Task.Run(() => SendMessage(data));
         }
-        public virtual void SendMessage(string message)
+        public virtual void SendMessage(string message, Encoding encoding = null)
         {
-            byte[] data = _encoding.GetBytes(message);
+            var encodingCurrent = encoding == null ? Encoding : encoding;
+
+            byte[] data = encodingCurrent.GetBytes(message);
+
+            var code = AddEncodingCode(Constants.DP_MESSAGE_STRING, GetEncodingCode(encodingCurrent));
 
             _mutexWritePipe.WaitOne();
-                _dpipe.Write(Constants.DP_MESSAGE_STRING, data, 0, data.Length);
+                _dpipe.Write(code, data, 0, data.Length);
             _mutexWritePipe.ReleaseMutex();
         }
         public virtual void SendMessageAsync(string message)
@@ -131,12 +183,16 @@ namespace CreatorDK.IO.DPipes
         {
             Task.Run(() => SendInfo(data));
         }
-        public virtual void SendInfo(string message)
+        public virtual void SendInfo(string message, Encoding encoding = null)
         {
-            byte[] data = _encoding.GetBytes(message);
+            var encodingCurrent = encoding == null ? Encoding : encoding;
+
+            byte[] data = encodingCurrent.GetBytes(message);
+
+            var code = AddEncodingCode(Constants.DP_INFO_STRING, GetEncodingCode(encodingCurrent));
 
             _mutexWritePipe.WaitOne();
-                _dpipe.Write(Constants.DP_INFO_STRING, data, 0, data.Length);
+                _dpipe.Write(code, data, 0, data.Length);
             _mutexWritePipe.ReleaseMutex();
         }
         public virtual void SendInfoAsync(string message)
@@ -153,12 +209,16 @@ namespace CreatorDK.IO.DPipes
         {
             Task.Run(() => SendWarning(data));
         }
-        public virtual void SendWarning(string message)
+        public virtual void SendWarning(string message, Encoding encoding = null)
         {
-            byte[] data = _encoding.GetBytes(message);
+            var encodingCurrent = encoding == null ? Encoding : encoding;
+
+            byte[] data = encodingCurrent.GetBytes(message);
+
+            var code = AddEncodingCode(Constants.DP_WARNING_STRING, GetEncodingCode(encodingCurrent));
 
             _mutexWritePipe.WaitOne();
-                _dpipe.Write(Constants.DP_WARNING_STRING, data, 0, data.Length);
+                _dpipe.Write(code, data, 0, data.Length);
             _mutexWritePipe.ReleaseMutex();
         }
         public virtual void SendWarningAsync(string message)
@@ -175,12 +235,16 @@ namespace CreatorDK.IO.DPipes
         {
             Task.Run(() => SendError(data));
         }
-        public virtual void SendError(string message)
+        public virtual void SendError(string message, Encoding encoding = null)
         {
-            byte[] data = _encoding.GetBytes(message);
+            var encodingCurrent = encoding == null ? Encoding : encoding;
+
+            byte[] data = encodingCurrent.GetBytes(message);
+
+            var code = AddEncodingCode(Constants.DP_WARNING_STRING, GetEncodingCode(encodingCurrent));
 
             _mutexWritePipe.WaitOne();
-                _dpipe.Write(Constants.DP_ERROR_STRING, data, 0, data.Length);
+                _dpipe.Write(code, data, 0, data.Length);
             _mutexWritePipe.ReleaseMutex();
         }
         public virtual void SendErrorAsync(string message)
@@ -188,46 +252,71 @@ namespace CreatorDK.IO.DPipes
             Task.Run(() => SendError(message));
         }
 
-        public void Send(DPipeMessageType messageType, byte[] data)
+        public void Send(DP_MESSAGE_TYPE messageType, byte[] data)
         {
             switch(messageType) 
             { 
-                case DPipeMessageType.Message:
+                case DP_MESSAGE_TYPE.MESSAGE:
                     SendMessage(data); break;
-                case DPipeMessageType.Info:
+                case DP_MESSAGE_TYPE.MESSAGE_INFO:
                     SendInfo(data); break;
-                case DPipeMessageType.Warning:
+                case DP_MESSAGE_TYPE.MESSAGE_WARNING:
                     SendWarning(data); break;
-                case DPipeMessageType.Error:
+                case DP_MESSAGE_TYPE.MESSAGE_ERROR:
                     SendError(data); break;
                 default:
                     throw new Exception("Unknown message type");
             }
         }
-        public void SendAsync(DPipeMessageType messageType, byte[] data)
+        public void SendAsync(DP_MESSAGE_TYPE messageType, byte[] data)
         {
             Task.Run(() => Send(messageType, data));
         }
 
-        public void Send(DPipeMessageType messageType, string message)
+        public void Send(DP_MESSAGE_TYPE messageType, string message, Encoding encoding = null)
         {
             switch (messageType)
             {
-                case DPipeMessageType.Message:
-                    SendMessage(message); break;
-                case DPipeMessageType.Info:
-                    SendInfo(message); break;
-                case DPipeMessageType.Warning:
-                    SendWarning(message); break;
-                case DPipeMessageType.Error:
-                    SendError(message); break;
+                case DP_MESSAGE_TYPE.MESSAGE:
+                    SendMessage(message, encoding); 
+                    break;
+                case DP_MESSAGE_TYPE.MESSAGE_INFO:
+                    SendInfo(message, encoding); 
+                    break;
+                case DP_MESSAGE_TYPE.MESSAGE_WARNING:
+                    SendWarning(message, encoding); 
+                    break;
+                case DP_MESSAGE_TYPE.MESSAGE_ERROR:
+                    SendError(message, encoding); 
+                    break;
                 default:
                     throw new Exception("Unknown message type");
             }
         }
-        public void SendAsync(DPipeMessageType messageType, string message)
+        public void SendAsync(DP_MESSAGE_TYPE messageType, string message, Encoding encoding = null)
         {
-            Task.Run(() => Send(messageType, message));
+            Task.Run(() => Send(messageType, message, encoding));
+        }
+
+        public void Disconnect()
+        {
+            _dpipe.Disconnect();
+        }
+        public virtual void Disconnect(string disconnectMessage, Encoding encoding = null)
+        {
+            if (disconnectMessage == null)
+                Disconnect();
+
+            encoding = encoding == null ? Encoding : encoding;
+
+            byte[] disonnectData = null;
+
+            if (!string.IsNullOrEmpty(disconnectMessage))
+                disonnectData = encoding.GetBytes(disconnectMessage);
+
+            var encodingCode = GetEncodingCode(encoding);
+
+            _dpipe.Disconnect(disonnectData, encodingCode);
         }
     }
 }

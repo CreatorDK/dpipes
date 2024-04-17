@@ -15,7 +15,7 @@ private:
 	BoolTrigger connectTrigger;
 	BoolTrigger dataReceivedTrigger;
 
-	void ClientConnectCallback(PacketHeader packet) {
+	void ClientConnectCallback(IDPipe* pipe, PacketHeader packet) {
 		DWORD nBytesWritten;
 		WriteServerLine() << "1. Client Connected" << END_LINE;
 		WriteServerLine() << "2. Writing Greeting to Client" << END_LINE;
@@ -25,7 +25,7 @@ private:
 		connectTrigger.SetComplete();
 	}
 
-	void PacketHeaderRecevicedCallback(PacketHeader header) {
+	void PacketHeaderRecevicedCallback(IDPipe* pipe, PacketHeader header) {
 		DWORD nBytesToRead = header.DataSize();
 		DWORD nBytesRead;
 		char* buf = (char*)malloc(nBytesToRead);
@@ -48,8 +48,8 @@ public:
 
 		WriteTestName(params.pipeType);
 		_dpipe = DPipeBuilder::Create(params.pipeType, L"\\\\.\\pipe\\test-pipe-123");
-		_dpipe->SetClientConnectCallback([this](PacketHeader header) {ClientConnectCallback(header); });
-		_dpipe->SetPacketHeaderRecevicedCallback([this](PacketHeader header) {PacketHeaderRecevicedCallback(header); });
+		_dpipe->SetClientConnectCallback([this](IDPipe* pipe, PacketHeader header) {ClientConnectCallback(pipe, header); });
+		_dpipe->SetPacketHeaderRecevicedCallback([this](IDPipe* pipe, PacketHeader header) {PacketHeaderRecevicedCallback(pipe, header); });
 		_dpipe->Start();
 		auto handle = _dpipe->GetHandle();
 

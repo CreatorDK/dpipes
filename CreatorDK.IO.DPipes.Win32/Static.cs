@@ -11,7 +11,7 @@ namespace CreatorDK.IO.DPipes.Win32
             if (pipe == null)
                 throw new ArgumentNullException(nameof(pipe));
 
-            else if (pipe is DPipeAnonymus pipeAnonymus)
+            else if (pipe is DPAnonymous pipeAnonymus)
             {
                 SECURITY_ATTRIBUTES securityAttribute = new SECURITY_ATTRIBUTES()
                 {
@@ -48,9 +48,9 @@ namespace CreatorDK.IO.DPipes.Win32
                 pipeAnonymus.Start(serverReadSafePipeHandle, clientWriteSafePipeHandle, serverWriteSafePipeHandle, clientReadSafePipeHandle);
             }
 
-            else if (pipe.Type == DPIPE_TYPE.NAMED_PIPE)
+            else if (pipe.Type == DP_TYPE.NAMED_PIPE)
             {
-                var namedPipe = (DPipeNamed)pipe;
+                var namedPipe = (DPNamed)pipe;
 
                 SECURITY_ATTRIBUTES securityAttribute = new SECURITY_ATTRIBUTES()
                 {

@@ -11,7 +11,7 @@ namespace DPipeTestCS.ServerTests
         public ServerTest05(string testName, string title, string description) : base(testName, title, description) { }
 
         DPipe? _dpipe;
-        DPipeMessanger? _dpipeMessanger;
+        DPMessanger? _dpipeMessanger;
 
         BoolTrigger connectTrigger = new();
         BoolTrigger disconnectTrigger = new();
@@ -61,7 +61,7 @@ namespace DPipeTestCS.ServerTests
             if (_dpipe == null)
                 return;
 
-            _dpipeMessanger = new DPipeMessanger(_dpipe, Encoding.UTF8, true);
+            _dpipeMessanger = new DPMessanger(_dpipe, Encoding.UTF8, true);
             _dpipeMessanger.OnClientConnect = OnClientConnect;
             _dpipeMessanger.OnMessageStringReceived = OnMessageStringReceived;
             _dpipeMessanger.OnOtherSideDisconect = OnClientDisconnect;

@@ -10,7 +10,7 @@ namespace DPipeTestCS.ClientTests
         public ClientTest10(string testName, string title, string description) : base(testName, title, description) { }
 
         DPipe? _dpipe;
-        DPipeMessanger? _dpipeMessanger;
+        DPMessanger? _dpipeMessanger;
 
         BoolTrigger disconnectTrigger = new();
         BoolTrigger messageReceivedTrigger = new();
@@ -71,7 +71,7 @@ namespace DPipeTestCS.ClientTests
             if (NewConsole)
                 WriteTestName(_dpipe.Type);
 
-            _dpipeMessanger = new DPipeMessanger(_dpipe, Encoding.Unicode, true);
+            _dpipeMessanger = new DPMessanger(_dpipe, Encoding.Unicode, true);
             _dpipeMessanger.OnMessageStringReceived = OnMessageStringReceived;
             _dpipeMessanger.OnOtherSideDisconect = OnOtherSideDisconnect;
             WriteLine("1. Connecting to Pipe");

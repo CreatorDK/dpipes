@@ -46,11 +46,11 @@ void GetStartParamsServer(int argc, wchar_t* argv[], start_params_server& params
 	wstring pipeType = wstring(argv[2]);
 
 	if (pipeType == L"anonymous")
-		params.pipeType = DPIPE_TYPE::ANONYMOUS_PIPE;
+		params.pipeType = DP_TYPE::ANONYMOUS_PIPE;
 	else if (pipeType == L"named")
-		params.pipeType = DPIPE_TYPE::NAMED_PIPE;
+		params.pipeType = DP_TYPE::NAMED_PIPE;
 	else if (pipeType == L"all")
-		params.pipeType = DPIPE_TYPE::ANONYMOUS_PIPE;
+		params.pipeType = DP_TYPE::ANONYMOUS_PIPE;
 	else {
 		throw exception("Unknown pipeType argument");
 	}

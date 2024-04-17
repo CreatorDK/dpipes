@@ -1,4 +1,4 @@
 ﻿namespace CreatorDK.IO.DPipes
 {
-    public delegate void DPHandler(DPClientRequest request);
+    public delegate void DPHandler(DPReceivedRequest request);
 }
